@@ -43,6 +43,9 @@
     touch: document.getElementById('touch'),
     actBtn: document.getElementById('actBtn'),
     skinRow: document.getElementById('skinRow'),
+    paw: document.getElementById('pawCount'),
+    clockOrb: document.getElementById('clockOrb'),
+    clockLabel: document.getElementById('clockLabel'),
   };
 
   // ---- Skins (editable-skin groundwork) ------------------------------------
@@ -80,7 +83,7 @@
   }
 
   // ---- World data ----------------------------------------------------------
-  let world, player, game, npcs, coins, berries, gems, trash, momo, dogs, bin, sign, others = [];
+  let world, player, game, npcs, coins, berries, gems, trash, momo, dogs, bin, sign, den, loose, others = [];
 
   function inRect(x, y, r, pad) { return x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad; }
 
@@ -178,7 +181,14 @@
     world = buildWorld();
     buildSkinPicker();
 
-    player = { x: world.spawn.x, y: world.spawn.y, w: 34, h: 26, speed: 2.8, flip: true, walk: 0, moving: false, carrying: 0, pal: chosenSkin.pal };
+    player = { x: world.spawn.x, y: world.spawn.y, w: 34, h: 26, speed: 2.8, flip: true, walk: 0, moving: false, trashCarry: 0, carry: { coins: 0, gems: 0, berries: 0 }, pal: chosenSkin.pal };
+
+    // The Den — the player's home; carried loot is banked here
+    den = { x: world.spawn.x + 230, y: world.spawn.y + 150, w: 96, h: 78 };
+    loose = [];
+    // keep the Den's footprint clear of scenery so HOME is always reachable/visible
+    const clearDen = (arr, pad) => { for (let i = arr.length - 1; i >= 0; i--) { const o = arr[i]; if (o.x > den.x - pad && o.x < den.x + den.w + pad && o.y > den.y - pad && o.y < den.y + den.h + pad) arr.splice(i, 1); } };
+    clearDen(world.trees, 46); clearDen(world.rocks, 34); clearDen(world.bushes, 24);
 
     npcs = [
       { name: 'Rocky', x: world.spawn.x + 120, y: world.spawn.y - 150, flip: true, walk: 0, pal: PAL_ROCKY, bob: 0 },
@@ -205,7 +215,7 @@
       mkDog(2900, 1450, 'se'),
     ];
 
-    game = { coins: 0, berries: 0, stage: 0, running: false, dialogQueue: [], onDialogEnd: null, t: 0, toast: '', toastT: 0 };
+    game = { coins: 0, berries: 0, stage: 0, running: false, dialogQueue: [], onDialogEnd: null, t: 0, toast: '', toastT: 0, dayness: 1, timeBand: '' };
     updateHUD();
   }
   function mkDog(x, y, tag) { return { x, y, home: { x, y }, tag, w: 40, h: 26, dir: rng() < 0.5 ? 1 : -1, walk: 0, chase: false, scared: 0, questShooed: false }; }
@@ -341,6 +351,26 @@
     ctx.fillStyle = '#2c5a35'; roundedRect(x - 19, y - 32, 38, 7, 3);
     ctx.strokeStyle = '#eaf5ec'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y - 14, 6, 0.4, 5.9); ctx.stroke();
   }
+  function drawDen(d) {
+    const x = d.x, y = d.y, w = d.w, h = d.h;
+    softShadow(x + w / 2, y + h + 4, w * 0.62, 12, 0.22);
+    // burrow / crate body
+    ctx.fillStyle = '#6b4a2a'; roundedRect(x, y + h * 0.32, w, h * 0.68, 12);
+    ctx.fillStyle = '#7c5836'; roundedRect(x, y + h * 0.32, w, 10, 8);
+    ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.lineWidth = 1.5; for (let gx = x + 20; gx < x + w; gx += 22) { ctx.beginPath(); ctx.moveTo(gx, y + h * 0.42); ctx.lineTo(gx, y + h); ctx.stroke(); }
+    // leafy roof
+    ctx.fillStyle = '#4e7a34'; ctx.beginPath(); ctx.moveTo(x - 10, y + h * 0.36); ctx.lineTo(x + w / 2, y - 4); ctx.lineTo(x + w + 10, y + h * 0.36); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#5cb343'; ctx.beginPath(); ctx.moveTo(x - 10, y + h * 0.36); ctx.lineTo(x + w / 2, y - 4); ctx.lineTo(x + w / 2, y + h * 0.36); ctx.closePath(); ctx.fill();
+    // round doorway
+    ctx.fillStyle = '#241a12'; ctx.beginPath(); ctx.arc(x + w / 2, y + h * 0.72, 17, Math.PI, 0); ctx.fill(); ctx.fillRect(x + w / 2 - 17, y + h * 0.72, 34, h * 0.28);
+    // a few stashed shinies by the door
+    ctx.fillStyle = '#ffd23f'; ellipse(x + w / 2 - 22, y + h - 6, 3.5, 3); ellipse(x + w / 2 + 22, y + h - 4, 3, 2.6); ellipse(x + w / 2 + 26, y + h - 9, 2.6, 2.4);
+    // little flag
+    ctx.fillStyle = '#6a5744'; ctx.fillRect(x + w - 16, y - 16, 3, 20);
+    ctx.fillStyle = '#2fa96b'; ctx.beginPath(); ctx.moveTo(x + w - 13, y - 16); ctx.lineTo(x + w - 13 + 16, y - 12); ctx.lineTo(x + w - 13, y - 8); ctx.closePath(); ctx.fill();
+    // label
+    ctx.fillStyle = '#fff8e6'; ctx.font = '700 12px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('HOME', x + w / 2, y + h * 0.22);
+  }
   function drawSign(s) {
     ctx.fillStyle = '#6a5744'; ctx.fillRect(s.x - 2, s.y - 22, 4, 24);
     ctx.fillStyle = '#8a7050'; roundedRect(s.x - 26, s.y - 44, 52, 24, 4);
@@ -401,6 +431,7 @@
     for (const r of world.rocks) if (Math.hypot(px - r.x, py - (r.y + 2)) < r.r * 0.8) return true;
     for (const h of world.houses) if (px > h.x - 4 && px < h.x + h.w + 4 && py > h.y + h.h * 0.42 && py < h.y + h.h + 4) return true;
     if (px > bin.x - bin.solid.w / 2 && px < bin.x + bin.solid.w / 2 && py > bin.y - bin.solid.h && py < bin.y) return true;
+    if (px > den.x + 4 && px < den.x + den.w - 4 && py > den.y + den.h * 0.4 && py < den.y + den.h) return true;
     return false;
   }
   function canMove(px, py, w, h) { return !(solidAt(px - w / 2, py) || solidAt(px + w / 2, py) || solidAt(px - w / 2, py - h) || solidAt(px + w / 2, py - h)); }
@@ -413,6 +444,8 @@
     for (const d of dogs) { const dd = dist(player, d); if (dd < 66 && dd < bestD) { best = { kind: 'dog', ref: d }; bestD = dd; } }
     const db = Math.hypot(player.x - bin.x, player.y - (bin.y - 12));
     if (db < 66 && db < bestD) { best = { kind: 'bin', ref: bin }; bestD = db; }
+    const dd2 = Math.hypot(player.x - (den.x + den.w / 2), player.y - (den.y + den.h));
+    if (dd2 < 78 && dd2 < bestD) { best = { kind: 'den', ref: den }; bestD = dd2; }
     return best;
   }
   function say(who, lines, onEnd) { game.dialogQueue = lines.slice(); game.dialogWho = who; game.onDialogEnd = onEnd || null; advanceDialog(); }
@@ -422,27 +455,29 @@
   const COINS_GOAL = 12, BERRY_GOAL = 6;
   const QUESTS = {
     0: { name: 'Meet the Pack', obj: () => 'Talk to Rocky in the clearing.' },
-    1: { name: 'Waddle & Collect', obj: () => `Collect JIMO coins — <b>${Math.min(game.coins, COINS_GOAL)}/${COINS_GOAL}</b>, then see Rocky.` },
-    2: { name: 'Berry Run', obj: () => `Pick forest berries — <b>${game.berries}/${BERRY_GOAL}</b>, then see Rocky.` },
+    1: { name: 'Waddle & Bank', obj: () => `Grab loot, carry it to your Den (HOME) and bank it — <b>${Math.min(game.coins, COINS_GOAL)}/${COINS_GOAL} JIMO</b>, then see Rocky.` },
+    2: { name: 'Berry Run', obj: () => `Pick forest berries and bank them at your Den — <b>${game.berries}/${BERRY_GOAL}</b>, then see Rocky.` },
     3: { name: 'Clean the Meadow', obj: () => `Grab trash bags and dump them in the recycling bin. Carrying: <b>${player.carrying}</b>.` },
     4: { name: 'Chase Off the Hounds', obj: () => `Shoo the 3 dogs away (press E next to one) — <b>${dogs.filter(d => d.questShooed).length}/3</b>.` },
     5: { name: 'Find Momo', obj: () => momo.following ? 'Bring Momo back to Rocky.' : 'Search the NW woods for the lost cub Momo.' },
     6: { name: 'All done', obj: () => 'Adventure complete.' },
   };
-  function updateHUD() { el.coin.textContent = game.coins; const q = QUESTS[game.stage]; if (q) { el.qName.textContent = q.name; el.qObj.innerHTML = (typeof q.obj === 'function') ? q.obj() : q.obj; } }
+  function carryCount() { return player.carry.coins + player.carry.gems + player.carry.berries; }
+  function updateHUD() { el.coin.textContent = game.coins; if (el.paw) el.paw.textContent = carryCount(); const q = QUESTS[game.stage]; if (q) { el.qName.textContent = q.name; el.qObj.innerHTML = (typeof q.obj === 'function') ? q.obj() : q.obj; } }
 
   function interact() {
     const near = nearestInteractable(); if (!near) return;
     if (near.kind === 'dog') { const d = near.ref; d.scared = game.t + 6000; d.chase = false; if (game.stage === 4) d.questShooed = true; toast('You hissed! The hound backs off.'); const ang = Math.atan2(d.y - player.y, d.x - player.x); d.x += Math.cos(ang) * 40; d.y += Math.sin(ang) * 40; updateHUD(); return; }
+    if (near.kind === 'den') { bankLoot(); return; }
     if (near.kind === 'bin') {
-      if (game.stage === 3 && player.carrying > 0) { const dumped = player.carrying; game.coins += dumped * 5; player.carrying = 0; say('You', [`Dumped ${dumped} trash bag(s). Recycled for ${dumped * 5} JIMO.`], () => { if (trash.every(x => x.got)) { game.stage = 4; toast('Meadow clean! Now deal with those hounds.'); } updateHUD(); }); }
+      if (game.stage === 3 && player.trashCarry > 0) { const dumped = player.trashCarry; game.coins += dumped * 5; player.trashCarry = 0; say('You', [`Dumped ${dumped} trash bag(s). Recycled for ${dumped * 5} JIMO.`], () => { if (trash.every(x => x.got)) { game.stage = 4; toast('Meadow clean! Now deal with those hounds.'); } updateHUD(); }); }
       else say('Recycling Bin', ['A sturdy green bin. Bring trash bags here to recycle them.']);
       return;
     }
     const n = near.ref;
     if (n.name === 'Pip') { say('Pip', ['Pip the raccoon, at your service.', 'Those dogs are the Catcher\'s hounds — bad news for a short-spined hero.', 'Rocky hands out the quests. Find him by the clearing.']); return; }
     switch (game.stage) {
-      case 0: say('Rocky', ['Well, waddle my whiskers — a hero with a short spine and a big heart.', 'The Trash Pack needs you, Jimothy.', `First job: collect ${COINS_GOAL} shiny JIMO coins around the world.`], () => { game.stage = 1; updateHUD(); }); break;
+      case 0: say('Rocky', ['Well, waddle my whiskers — a hero with a short spine and a big heart.', 'The Trash Pack needs you, Jimothy.', 'Here is how a raccoon gets rich: grab shiny loot, then carry it home to your Den to bank it.', 'Careful — what is in your paws is NOT safe. A hound can bump you and scatter it. Only banked loot is yours.', `First job: bank ${COINS_GOAL} JIMO. Your Den is the little HOME just east of here.`], () => { game.stage = 1; updateHUD(); }); break;
       case 1: if (game.coins >= COINS_GOAL) say('Rocky', ['Fastest waddler in the west!', `Now hop into the forest and pick me ${BERRY_GOAL} ripe berries.`], () => { game.stage = 2; updateHUD(); }); else say('Rocky', [`Not yet — ${game.coins}/${COINS_GOAL}. Keep waddling.`]); break;
       case 2: if (game.berries >= BERRY_GOAL) say('Rocky', ['Perfect, juicy ones.', 'The meadow is littered — collect the trash bags and dump them in the recycling bin.'], () => { game.stage = 3; updateHUD(); }); else say('Rocky', [`Only ${game.berries}/${BERRY_GOAL} berries. They grow among the trees.`]); break;
       case 3: say('Rocky', ['Grab the trash bags and take them to the green bin.']); break;
@@ -454,7 +489,13 @@
   function winGame() { game.running = false; el.winText.textContent = `You collected ${game.coins} JIMO, cleaned the meadow, chased off the Catcher's hounds and reunited the Trash Pack. Short spine, big adventure.`; el.win.classList.remove('hidden'); }
 
   // ---- Update --------------------------------------------------------------
+  const DAY_MS = 180000; // full day/night cycle
   function update(t) {
+    // day/night: dayness 1 = noon, 0 = midnight
+    game.dayness = 0.5 + 0.5 * Math.cos((t % DAY_MS) / DAY_MS * Math.PI * 2);
+    const band = game.dayness > 0.6 ? 'Day' : game.dayness > 0.32 ? 'Dusk' : 'Night';
+    if (band !== game.timeBand) { game.timeBand = band; if (el.clockLabel) el.clockLabel.textContent = band; if (el.clockOrb) el.clockOrb.classList.toggle('night', band === 'Night'); }
+
     const inp = readInput();
     let vx = (inp.r ? 1 : 0) - (inp.l ? 1 : 0), vy = (inp.d ? 1 : 0) - (inp.u ? 1 : 0);
     player.moving = !!(vx || vy);
@@ -466,11 +507,14 @@
       player.walk += 0.25;
     }
 
-    for (let i = coins.length - 1; i >= 0; i--) { const c = coins[i]; if (Math.hypot(player.x - c.x, player.y - c.y) < 26) { coins.splice(i, 1); game.coins += 1; toast('+1 JIMO'); updateHUD(); } }
-    for (let i = gems.length - 1; i >= 0; i--) { const gm = gems[i]; if (Math.hypot(player.x - gm.x, player.y - gm.y) < 26) { gems.splice(i, 1); game.coins += 10; toast('Gem! +10 JIMO'); updateHUD(); } }
-    for (const b of berries) if (!b.got && Math.hypot(player.x - b.x, player.y - b.y) < 26) { b.got = true; game.berries += 1; game.coins += 2; toast('Berry picked (+2 JIMO)'); updateHUD(); }
+    // Loot goes into your PAWS first — carry it home to the Den to bank it
+    for (let i = coins.length - 1; i >= 0; i--) { const c = coins[i]; if (Math.hypot(player.x - c.x, player.y - c.y) < 26) { coins.splice(i, 1); player.carry.coins += 1; toast('Grabbed a coin — bank it at your Den'); updateHUD(); } }
+    for (let i = gems.length - 1; i >= 0; i--) { const gm = gems[i]; if (Math.hypot(player.x - gm.x, player.y - gm.y) < 26) { gems.splice(i, 1); player.carry.gems += 1; toast('Shiny gem! Worth 10 — carry it home'); updateHUD(); } }
+    for (const b of berries) if (!b.got && Math.hypot(player.x - b.x, player.y - b.y) < 26) { b.got = true; player.carry.berries += 1; toast('Berry picked — bank it at your Den'); updateHUD(); }
+    // scattered loot dropped after a scare — grab it back
+    for (let i = loose.length - 1; i >= 0; i--) { const o = loose[i]; if (Math.hypot(player.x - o.x, player.y - o.y) < 26) { loose.splice(i, 1); player.carry[o.type] += 1; updateHUD(); } }
 
-    if (game.stage === 3) for (const tr of trash) if (!tr.got && Math.hypot(player.x - tr.x, player.y - tr.y) < 28) { tr.got = true; player.carrying += 1; updateHUD(); toast('Picked up a trash bag'); }
+    if (game.stage === 3) for (const tr of trash) if (!tr.got && Math.hypot(player.x - tr.x, player.y - tr.y) < 28) { tr.got = true; player.trashCarry += 1; updateHUD(); toast('Picked up a trash bag'); }
 
     if (game.stage === 5 && !momo.following && Math.hypot(player.x - momo.x, player.y - momo.y) < 42) { momo.following = true; updateHUD(); say('Momo', ['(happy chirp)', 'Momo waddles out and follows you. Take them to Rocky.']); }
     if (momo.following) { const tx = player.x - (player.flip ? -30 : 30), ty = player.y + 6; momo.x += (tx - momo.x) * 0.08; momo.y += (ty - momo.y) * 0.08; momo.flip = (tx < momo.x); if (player.moving) momo.walk += 0.2; }
@@ -479,19 +523,39 @@
     for (const d of dogs) {
       const scared = d.scared > t, dp = Math.hypot(player.x - d.x, player.y - d.y);
       if (scared) { const ang = Math.atan2(d.home.y - d.y, d.home.x - d.x); if (Math.hypot(d.home.x - d.x, d.home.y - d.y) > 6) { const nx = Math.cos(ang) * 2.4, ny = Math.sin(ang) * 2.4; if (canMove(d.x + nx, d.y, d.w, d.h)) d.x += nx; if (canMove(d.x, d.y + ny, d.w, d.h)) d.y += ny; d.flip = nx < 0; d.walk += 0.3; } d.chase = false; continue; }
-      d.chase = dp < 170 && game.stage >= 1;
-      if (d.chase) { const ang = Math.atan2(player.y - d.y, player.x - d.x), nx = Math.cos(ang) * 2.1, ny = Math.sin(ang) * 2.1; if (canMove(d.x + nx, d.y, d.w, d.h)) d.x += nx; if (canMove(d.x, d.y + ny, d.w, d.h)) d.y += ny; d.flip = nx < 0; d.walk += 0.3; if (dp < 26) spooked(); }
+      // By DAY the hounds are more dangerous: bigger chase range and faster
+      const range = 120 + game.dayness * 100, spd = 1.8 + game.dayness * 0.8;
+      d.chase = dp < range && game.stage >= 1;
+      if (d.chase) { const ang = Math.atan2(player.y - d.y, player.x - d.x), nx = Math.cos(ang) * spd, ny = Math.sin(ang) * spd; if (canMove(d.x + nx, d.y, d.w, d.h)) d.x += nx; if (canMove(d.x, d.y + ny, d.w, d.h)) d.y += ny; d.flip = nx < 0; d.walk += 0.3; if (dp < 26) spooked(); }
       else { const nx = d.x + d.dir * 1.1; if (Math.abs(nx - d.home.x) > 140 || !canMove(nx, d.y, d.w, d.h)) d.dir *= -1; else d.x = nx; d.flip = d.dir < 0; d.walk += 0.12; }
     }
 
     for (const bf of world.butterflies) { bf.phase += 0.03; bf.x += Math.cos(bf.phase * 1.3) * 0.5; bf.y += Math.sin(bf.phase) * 0.4; }
     game.t = t;
   }
+  function bankLoot() {
+    const c = player.carry, total = c.coins + c.gems + c.berries;
+    if (total === 0) { say('Your Den', ['Home sweet trash. Go fill your paws with loot, then come back to bank it here — safe from the hounds.']); return; }
+    const jimo = c.coins + c.gems * 10 + c.berries * 2;
+    game.coins += jimo; game.berries += c.berries;
+    player.carry = { coins: 0, gems: 0, berries: 0 };
+    say('Your Den', [`Stashed ${total} item(s) for ${jimo} JIMO. Your bank is safe even if a hound catches you.`]);
+    updateHUD();
+  }
+  function dropCarry() {
+    const c = player.carry, list = [];
+    for (let i = 0; i < c.coins; i++) list.push('coins');
+    for (let i = 0; i < c.gems; i++) list.push('gems');
+    for (let i = 0; i < c.berries; i++) list.push('berries');
+    for (const ty of list) { const a = rng() * 6.283, r = 20 + rng() * 44; loose.push({ x: player.x + Math.cos(a) * r, y: player.y + Math.sin(a) * r, type: ty, bob: rng() * 6, spin: rng() * 6 }); }
+    player.carry = { coins: 0, gems: 0, berries: 0 };
+  }
   function spooked() {
-    const lost = Math.min(game.coins, 3); game.coins -= lost; player.carrying = 0;
-    player.x = world.spawn.x; player.y = world.spawn.y;
-    for (const d of dogs) { d.x = d.home.x; d.y = d.home.y; d.chase = false; }
-    updateHUD(); toast(`A hound caught you! Lost ${lost} JIMO.`);
+    const had = carryCount();
+    dropCarry(); player.trashCarry = 0;
+    for (const d of dogs) { d.scared = game.t + 3000; d.chase = false; }
+    updateHUD();
+    toast(had > 0 ? 'A hound bumped you — you dropped your loot! Grab it back.' : 'A hound bumped you! Keep your distance.');
   }
 
   // ---- Minimap -------------------------------------------------------------
@@ -508,15 +572,19 @@
     for (const c of coins) dot(c.x, c.y, '#e0a92b', 1.5);
     for (const gm of gems) dot(gm.x, gm.y, '#3fd0d8', 1.6);
     for (const b of berries) if (!b.got) dot(b.x, b.y, '#d1466a', 1.5);
+    for (const o of loose) dot(o.x, o.y, '#e0a92b', 1.3);
     for (const n of npcs) { dot(n.x, n.y, '#2fa96b', 2.6); }
     for (const d of dogs) { dot(d.x, d.y, d.scared > game.t ? '#9aa4b2' : '#c33', 2.6); }
     if (momo.following || game.stage === 5) dot(momo.x, momo.y, '#a855f7', 2.4);
+    // home (Den)
+    ctx.fillStyle = '#ffb14e'; const hx = ox + (den.x + den.w / 2) * sx, hy = oy + (den.y + den.h / 2) * sy; ctx.fillRect(hx - 2.6, hy - 2.6, 5.2, 5.2);
     // you
     ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#1b2430'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(ox + player.x * sx, oy + player.y * sy, 3.2, 0, 6.283); ctx.fill(); ctx.stroke();
     ctx.restore(); ctx.globalAlpha = 1;
     // legend
-    const ly = oy + mh + 10, items = [['#ffd23f', 'You'], ['#2fa96b', 'Friend'], ['#c33', 'Dog'], ['#e0a92b', 'Coin'], ['#d1466a', 'Berry'], ['#3fd0d8', 'Gem']];
-    ctx.fillStyle = 'rgba(255,255,255,.92)'; roundedRect(ox - 4, ly - 6, mw + 8, 40, 8);
+    const items = [['#ffd23f', 'You'], ['#ffb14e', 'Home'], ['#c33', 'Dog'], ['#2fa96b', 'Friend'], ['#e0a92b', 'Coin'], ['#d1466a', 'Berry'], ['#3fd0d8', 'Gem']];
+    const rows = Math.ceil(items.length / 3), ly = oy + mh + 10, lh = rows * 16 + 8;
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; roundedRect(ox - 4, ly - 6, mw + 8, lh, 8);
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '600 10px Fredoka, sans-serif';
     items.forEach((it, i) => { const cx = ox + 4 + (i % 3) * 56, cyy = ly + 4 + ((i / 3) | 0) * 16; ctx.fillStyle = it[0]; ctx.beginPath(); ctx.arc(cx + 3, cyy, 3.4, 0, 6.283); ctx.fill(); ctx.fillStyle = '#39434f'; ctx.fillText(it[1], cx + 10, cyy + 0.5); });
   }
@@ -537,6 +605,7 @@
     for (const c of coins) drawCoin(c, t);
     for (const gm of gems) drawGem(gm, t);
     for (const b of berries) if (!b.got) drawBerry(b, t);
+    for (const o of loose) { if (o.type === 'coins') drawCoin(o, t); else if (o.type === 'gems') drawGem(o, t); else drawBerry(o, t); }
     if (game.stage <= 3) for (const tr of trash) if (!tr.got) drawTrashBag(tr);
 
     const draws = [];
@@ -545,6 +614,7 @@
     for (const tr of world.trees) if (vis(tr.x, tr.y, 80)) draws.push({ y: tr.y, fn: () => drawTree(tr, t) });
     for (const r of world.rocks) if (vis(r.x, r.y, 50)) draws.push({ y: r.y, fn: () => drawRock(r) });
     for (const h of world.houses) if (vis(h.x + h.w / 2, h.y + h.h, 120)) draws.push({ y: h.y + h.h, fn: () => drawHouse(h) });
+    draws.push({ y: den.y + den.h, fn: () => drawDen(den) });
     draws.push({ y: bin.y, fn: () => drawBin(bin) });
     draws.push({ y: sign.y, fn: () => drawSign(sign) });
     for (const n of npcs) draws.push({ y: n.y, fn: () => drawRaccoon(n.x, n.y, n.pal, 1, n.walk + n.bob, n.flip, SPRITES.npc) });
@@ -559,11 +629,19 @@
 
     const near = nearestInteractable();
     if (near && !el.dialog.classList.contains('show')) {
-      const r = near.ref, bx = r.x, by = (near.kind === 'bin' ? r.y - 44 : r.y - 58);
+      const r = near.ref;
+      let bx, by;
+      if (near.kind === 'den') { bx = den.x + den.w / 2; by = den.y - 24; }
+      else if (near.kind === 'bin') { bx = r.x; by = r.y - 44; }
+      else { bx = r.x; by = r.y - 58; }
       ctx.fillStyle = 'rgba(27,36,48,.92)'; roundedRect(bx - 13, by - 13, 26, 22, 6);
       ctx.fillStyle = '#ffd23f'; ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('E', bx, by - 1);
     }
     ctx.restore();
+
+    // ---- Night tint (screen-space) ----
+    const dark = (1 - game.dayness);
+    if (dark > 0.02) { ctx.fillStyle = `rgba(22,28,58,${dark * 0.45})`; ctx.fillRect(0, 0, vw, vh); }
 
     // screen-space UI: minimap + toast
     if (game.running) drawMinimap();
