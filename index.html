@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>$JIMOTHY — Short Spine, Big Adventure | Solana Memecoin</title>
+  <meta name="description" content="Jimothy is a short-spine-syndrome raccoon on the biggest little adventure on Solana. Play the game. Join the trash pack. $JIMOTHY." />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="$JIMOTHY — Short Spine, Big Adventure" />
+  <meta property="og:description" content="A short-spine raccoon on a big adventure. Solana memecoin + playable 2D game." />
+  <meta property="og:type" content="website" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <header class="nav">
+    <a href="#top" class="brand">
+      <span class="brand-mark">🦝</span>
+      <span class="brand-name">$JIMOTHY</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#lore">Lore</a>
+      <a href="#play">Play</a>
+      <a href="#tokenomics">Tokenomics</a>
+      <a href="#buy">How to Buy</a>
+      <a href="#roadmap">Roadmap</a>
+    </nav>
+    <a href="#buy" class="btn btn-small">Buy $JIMOTHY</a>
+  </header>
+
+  <!-- HERO -->
+  <section id="top" class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">The raccoon with a short spine and a big destiny</p>
+        <h1 class="title">MEET<br /><span class="title-accent">JIMOTHY</span></h1>
+        <p class="subtitle">Small back. Big adventure. Jimothy waddled out of the trash and straight onto <strong>Solana</strong>. He can't stand up straight — but he'll never back down.</p>
+
+        <div class="cta-row">
+          <a href="#buy" class="btn btn-primary">🚀 Buy $JIMOTHY</a>
+          <a href="#play" class="btn btn-ghost">🎮 Play the Game</a>
+        </div>
+
+        <div class="contract">
+          <span class="contract-label">Contract (Solana)</span>
+          <div class="contract-box">
+            <code id="ca">Coming soon — launching on pump.fun</code>
+            <button id="copyBtn" class="copy-btn" aria-label="Copy contract address">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-art">
+        <canvas id="mascot" width="300" height="300" aria-label="Pixel art of Jimothy the raccoon"></canvas>
+        <div class="hero-badges">
+          <span class="badge">🧡 Community owned</span>
+          <span class="badge">🎮 Playable</span>
+          <span class="badge">🔒 LP locked*</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="marquee">
+      <div class="marquee-track">
+        <span>SHORT SPINE · BIG ADVENTURE ·&nbsp;</span>
+        <span>HUNCHED BUT UNBOTHERED ·&nbsp;</span>
+        <span>TRASH PACK ASSEMBLE ·&nbsp;</span>
+        <span>SHORT SPINE · BIG ADVENTURE ·&nbsp;</span>
+        <span>HUNCHED BUT UNBOTHERED ·&nbsp;</span>
+        <span>TRASH PACK ASSEMBLE ·&nbsp;</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- LORE -->
+  <section id="lore" class="section">
+    <div class="section-head">
+      <h2>The Legend of Jimothy</h2>
+      <p class="section-sub">Every hero has an origin. His just happens to be a dumpster behind a taco stand.</p>
+    </div>
+    <div class="lore-grid">
+      <article class="lore-card">
+        <div class="lore-emoji">🌙</div>
+        <h3>Born in the Bins</h3>
+        <p>Jimothy came into the world with a short spine — hunched, stubby, and impossible to ignore. The other raccoons said he'd never make it past the recycling. Jimothy said nothing. Jimothy just started walking.</p>
+      </article>
+      <article class="lore-card">
+        <div class="lore-emoji">🗺️</div>
+        <h3>The Big Adventure</h3>
+        <p>From the alley to the forest to the blockchain, Jimothy waddles onward — collecting shiny coins, dodging raccoon-catchers, and proving that a short spine can still carry a giant heart.</p>
+      </article>
+      <article class="lore-card">
+        <div class="lore-emoji">🧡</div>
+        <h3>The Trash Pack</h3>
+        <p>He's not alone anymore. Every holder is part of the Trash Pack — a chaotic little family of degens, misfits, and believers who know: it's not the size of the spine, it's the size of the adventure.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- PLAY -->
+  <section id="play" class="section section-alt">
+    <div class="section-head">
+      <h2>Jimothy's Trash Dash</h2>
+      <p class="section-sub">Help Jimothy waddle as far as he can. Tap / Space / Click to jump. Collect coins, dodge the trash cans.</p>
+    </div>
+
+    <div class="game-wrap">
+      <div class="game-hud">
+        <span>Score: <b id="score">0</b></span>
+        <span>Best: <b id="best">0</b></span>
+      </div>
+      <canvas id="game" width="900" height="360"></canvas>
+      <div id="gameOverlay" class="game-overlay">
+        <h3 id="overlayTitle">Jimothy's Trash Dash</h3>
+        <p id="overlayText">Press Space, tap, or click to start waddling.</p>
+        <button id="startBtn" class="btn btn-primary">▶ Start</button>
+      </div>
+    </div>
+    <p class="game-note">Tip: the longer Jimothy runs, the faster the world gets. Short spine, fast feet.</p>
+  </section>
+
+  <!-- TOKENOMICS -->
+  <section id="tokenomics" class="section">
+    <div class="section-head">
+      <h2>Tokenomics</h2>
+      <p class="section-sub">No taxes. No nonsense. Just a raccoon and a dream.</p>
+    </div>
+    <div class="token-grid">
+      <div class="token-card">
+        <span class="token-num">1B</span>
+        <span class="token-label">Total Supply</span>
+      </div>
+      <div class="token-card">
+        <span class="token-num">0/0</span>
+        <span class="token-label">Buy / Sell Tax</span>
+      </div>
+      <div class="token-card">
+        <span class="token-num">100%</span>
+        <span class="token-label">Fair Launch</span>
+      </div>
+      <div class="token-card">
+        <span class="token-num">🔥</span>
+        <span class="token-label">LP Burned*</span>
+      </div>
+    </div>
+    <p class="fine-print">*Final launch details (supply, LP, mint authority) will be confirmed at launch. Placeholder values shown for the demo site.</p>
+  </section>
+
+  <!-- HOW TO BUY -->
+  <section id="buy" class="section section-alt">
+    <div class="section-head">
+      <h2>How to Buy $JIMOTHY</h2>
+      <p class="section-sub">Four little steps. Even a raccoon can do it.</p>
+    </div>
+    <ol class="steps">
+      <li>
+        <span class="step-num">1</span>
+        <h3>Get a Wallet</h3>
+        <p>Download <a href="https://phantom.app" target="_blank" rel="noopener noreferrer">Phantom</a> or Solflare on desktop or mobile and set up your Solana wallet.</p>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <h3>Load up on SOL</h3>
+        <p>Buy some SOL on an exchange and send it to your wallet, or buy directly inside Phantom.</p>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <h3>Swap for $JIMOTHY</h3>
+        <p>Head to <a href="https://jup.ag" target="_blank" rel="noopener noreferrer">Jupiter</a> or Raydium, paste the official contract address, and swap SOL for $JIMOTHY.</p>
+      </li>
+      <li>
+        <span class="step-num">4</span>
+        <h3>Join the Trash Pack</h3>
+        <p>Welcome home. Hop into the community, play the game, and enjoy the adventure.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ROADMAP -->
+  <section id="roadmap" class="section">
+    <div class="section-head">
+      <h2>The Adventure Map</h2>
+      <p class="section-sub">Where Jimothy waddles next.</p>
+    </div>
+    <div class="roadmap">
+      <div class="phase">
+        <span class="phase-tag">Phase 1 · The Alley</span>
+        <h3>Launch & Waddle</h3>
+        <ul>
+          <li>Fair launch on Solana</li>
+          <li>Website + playable Trash Dash</li>
+          <li>Community kickoff on X &amp; Telegram</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <span class="phase-tag">Phase 2 · The Forest</span>
+        <h3>Grow the Pack</h3>
+        <ul>
+          <li>Meme contests &amp; sticker packs</li>
+          <li>CoinGecko / CMC listings</li>
+          <li>Game leaderboard &amp; high-score events</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <span class="phase-tag">Phase 3 · The Mountain</span>
+        <h3>The Big Adventure</h3>
+        <ul>
+          <li>Full 2D adventure game (levels, bosses)</li>
+          <li>On-chain rewards for top players</li>
+          <li>Jimothy merch &amp; collabs</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMMUNITY -->
+  <section class="section section-alt community">
+    <h2>Join the Trash Pack</h2>
+    <p class="section-sub">The adventure is better with the whole raccoon family.</p>
+    <div class="social-row">
+      <a href="#" class="social-btn" target="_blank" rel="noopener noreferrer">𝕏 / Twitter</a>
+      <a href="#" class="social-btn" target="_blank" rel="noopener noreferrer">✈️ Telegram</a>
+      <a href="#" class="social-btn" target="_blank" rel="noopener noreferrer">🪐 Dexscreener</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-mark">🦝 $JIMOTHY</div>
+    <p class="disclaimer">
+      $JIMOTHY is a community meme coin with no intrinsic value or expectation of financial return.
+      There is no formal team or roadmap guarantee. This is not financial advice. Crypto is risky —
+      only spend what you can afford to lose. Do your own research.
+    </p>
+    <p class="copyright">© 2026 Jimothy. Hunched but unbothered.</p>
+  </footer>
+
+  <script src="game.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
