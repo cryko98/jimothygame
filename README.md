@@ -14,16 +14,24 @@ A fully static site + game — no build step, no dependencies, no image assets. 
 - Copy-to-clipboard contract address, responsive layout, disclaimer
 
 **The game (`game.html`) — "Jimothy's Adventures"**
-- Top-down 2D adventure across a biome world: grass plains, forests, flower meadows, a snowy patch, sandy beaches, ponds and dirt paths
-- Blocky, grainy terrain with feathered biome edges; cubic trees, rocks, bushes, flowers, mushrooms, lilies and ambient butterflies; depth-sorted rendering and soft shadows
-- Camera follows the player; WASD/arrows on desktop, on-screen d-pad on mobile
-- NPCs (Rocky, Pip) with multi-line dialog and a quest system:
-  1. **Waddle & Collect** — gather 8 JIMO coins
-  2. **Clean the Meadow** — pick up trash bags and recycle them at the bin
-  3. **Find Momo** — rescue the lost cub and bring them back
-- A patrolling dog that chases and spooks Jimothy
+- Large top-down 2D world (3600×2400) with five biomes: forest, flower meadow, snowfield, sandy beach and ponds, joined by dirt paths (ponds kept off the roads)
+- Soft cartoon art — round trees, rocks, bushes, flowers, mushrooms, lilies and butterflies; depth-sorted rendering and soft shadows
+- **Minimap with legend** (top-left), a follow camera, WASD/arrows on desktop and a touch d-pad on mobile
+- **Collectibles everywhere** — JIMO coins, forest berries and rare gems, all scattered randomly
+- **Custom skins** — pick Jimothy's look on the start screen (groundwork for the planned editable-skin multiplayer)
+- NPCs (Rocky, Pip) with multi-line dialog and a real quest line:
+  1. **Waddle & Collect** — gather 12 JIMO coins
+  2. **Berry Run** — pick 6 forest berries
+  3. **Clean the Meadow** — collect trash bags and recycle them at the bin
+  4. **Chase Off the Hounds** — shoo the three dogs (press E next to one)
+  5. **Find Momo** — rescue the lost cub and bring them home
+- **The dogs are the villains** — the Catcher's hounds patrol and chase; walk up and press E to hiss and scare one off
 
-The world generation and terrain/decoration rendering are adapted from the author's own "pokefight" open-world engine.
+The world layout and biome idea are adapted from the author's own "pokefight" open-world engine.
+
+### Roadmap in the code
+- `player.skin` / `SKINS` — swappable palettes; the start screen writes the choice to `localStorage`
+- `others[]` — a slot for remote players (drawn like NPCs) to make online multiplayer straightforward
 
 ## Files
 

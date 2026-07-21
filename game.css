@@ -86,6 +86,12 @@ html, body {
 .overlay-card p { color: var(--muted); font-size: 1.05rem; line-height: 1.5; }
 .controls-hint { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; margin: .3rem 0 .4rem; }
 .controls-hint span { background: #f1f5f2; border: 1px solid var(--line); padding: .4rem .8rem; border-radius: 10px; color: var(--muted); font-size: .9rem; }
+.skins { display: flex; flex-direction: column; align-items: center; gap: .55rem; }
+.skins-label { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.skin-row { display: flex; gap: .55rem; }
+.skin-swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; transition: transform .12s ease, border-color .12s ease; box-shadow: inset 0 -3px 6px rgba(0,0,0,.18); }
+.skin-swatch:hover { transform: scale(1.1); }
+.skin-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,169,107,.25), inset 0 -3px 6px rgba(0,0,0,.18); }
 .btn {
   font-family: inherit; font-weight: 700; font-size: 1.05rem; cursor: pointer;
   padding: .9rem 2rem; border-radius: 999px; border: none;
