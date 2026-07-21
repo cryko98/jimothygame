@@ -63,6 +63,7 @@ function drawJimothy(ctx, ox, oy, s, step) {
   const targets = [
     { cv: document.getElementById('mascot'), s: 13, ox: 22, oy: 40 },
     { cv: document.getElementById('mascotPlay'), s: 9, ox: 20, oy: 40 },
+    { cv: document.getElementById('brandMark'), s: 1.7, ox: 3, oy: 6 },
   ].filter(t => t.cv);
   if (!targets.length) return;
   let step = 0;
