@@ -13,15 +13,18 @@ A fully static site + game — no build step, no dependencies, no image assets. 
 - Story, game promo, Tokenomics, How to Buy (Phantom → SOL → Jupiter/Raydium), Roadmap, Community
 - Copy-to-clipboard contract address, responsive layout, disclaimer
 
-**The game (`game.html`) — "Jimothy Run"**
-An endless side-scrolling runner starring the Jimothy raccoon.
-- **Endless, procedural** track that blends a **forest** biome and a **city** biome with parallax backgrounds
-- **Jump & double-jump** over obstacles (logs, rocks, bins, hydrants, crates) and **gaps/chasms** — falling in ends the run
-- **The chasing dog is your health**: a lead meter drains over time and drops when you get hit; **food scraps** push the dog back. Lose the lead and it catches you.
+**The game (`game.html`) — "Jimothy Run 3D"**
+An endless side-scrolling runner in **real 3D** (Three.js), starring the Jimothy raccoon.
+- **Low-poly 3D world** built entirely from primitives — no external models. Lighting, soft shadows, fog and depth.
+- **Endless, procedural** track that blends a **forest** biome and a **city** biome (buildings, hydrants, bins)
+- **Jump & double-jump** over obstacles (logs, rocks, bins, hydrants, crates) and **real gaps/chasms** — fall in and the run ends
+- **The chasing dog is your health**: a lead meter drains over time and drops when you get hit; **food scraps** push the dog back. It runs on the ground and **physically hops obstacles and chasms** — no clipping through. Lose the lead and it catches you.
 - **Enemies** — dogs and people on the track; jump them or **throw a can** (a picked-up power-up) to knock them out
 - **Power-ups** from bins: cans (throwables), shield, speed boost, coin magnet
-- **Score = distance + collected**, saved to a **local leaderboard** (with a name entry on a new high score)
+- **Score = distance + collected**, saved to a **local leaderboard** (name entry on a new high score)
 - Controls: Space / Up / tap to jump, F / Down / button to throw; touch buttons on mobile
+
+Three.js (r128) is vendored as `three.min.js` so the game runs fully offline with no CDN.
 
 ### Roadmap in the code
 - Scores persist in `localStorage` (`jimothy_run_lb`); a **global online leaderboard** needs a small backend server — that's the main next step.
@@ -36,7 +39,8 @@ An endless side-scrolling runner starring the Jimothy raccoon.
 | `script.js` | Copy-contract button & UI helpers |
 | `game.html` | The game page |
 | `run.css` | Game HUD / overlay styling |
-| `run.js` | The endless-runner engine |
+| `run3d.js` | The 3D endless-runner engine |
+| `three.min.js` | Vendored Three.js r128 (rendering library) |
 
 ## Run locally
 
