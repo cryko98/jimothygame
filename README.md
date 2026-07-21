@@ -6,22 +6,47 @@ The official website for **Jimothy**, a short-spine-syndrome raccoon on the bigg
 
 ## What's inside
 
-A single-page, fully static memecoin site — no build step, no dependencies.
+A fully static memecoin site + game — no build step, no dependencies, no image assets.
 
-- **Hero** with a procedurally drawn pixel-art Jimothy (canvas, no image assets)
+**Landing page (`index.html`)**
+- **Hero** with a procedurally drawn Jimothy (canvas)
 - **Lore** — the legend of the trash panda
-- **Trash Dash** — a playable 2D endless-runner mini-game (jump, collect coins, dodge trash cans)
+- A promo that launches the full game on its own page
 - **Tokenomics**, **How to Buy** (Phantom → SOL → Jupiter/Raydium), **Roadmap**, **Community**
 - Copy-to-clipboard contract address, responsive layout, meme disclaimer
+
+**The game (`game.html`) — "Jimothy's Big Adventure"**
+- Top-down 2D adventure: open world with grass, paths, ponds, trees, houses
+- Camera follows the player; WASD/arrows on desktop, on-screen d-pad on mobile
+- NPCs (Rocky, Pip) with a multi-line dialog + quest system:
+  1. **Waddle & Collect** — gather 8 $JIMO coins
+  2. **Clean the Alley** — pick up 3 trash bags, recycle them at the bin
+  3. **Find Momo** — rescue the lost cub and bring them back
+- A patrolling **dog** that chases and spooks Jimothy
+- Cartoon vector raccoon art, depth-sorted rendering
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Page structure & content |
-| `styles.css` | All styling (dark trash-panda theme) |
-| `game.js` | Pixel-Jimothy painter + Trash Dash runner |
+| `index.html` | Landing page structure & content |
+| `styles.css` | Landing page styling (dark trash-panda theme) |
+| `game.js` | Pixel-Jimothy mascot painter (hero + promo) |
 | `script.js` | Copy-contract button & UI helpers |
+| `game.html` | Full-screen game page |
+| `game.css` | Game UI styling (HUD, dialog, overlays, mobile controls) |
+| `game-adventure.js` | The top-down adventure engine |
+
+## Upgrading to painted sprite art
+
+The game draws Jimothy as clean vector art by default. To swap in real painted
+sprite PNGs, drop them in `/assets` and set them at the top of `game-adventure.js`:
+
+```js
+SPRITES.player = loadImg('assets/jimothy.png');
+```
+
+If a sprite image is present it's used automatically instead of the vector drawing.
 
 ## Run locally
 

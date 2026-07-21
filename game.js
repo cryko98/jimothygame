@@ -58,17 +58,21 @@ function drawJimothy(ctx, ox, oy, s, step) {
   ctx.fillStyle = C.face;
 }
 
-/* ---- Hero mascot: big, centered, gently animated ---- */
+/* ---- Mascot: rendered into any canvas that wants it, gently animated ---- */
 (function mascot() {
-  const cv = document.getElementById('mascot');
-  if (!cv) return;
-  const ctx = cv.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
+  const targets = [
+    { cv: document.getElementById('mascot'), s: 13, ox: 22, oy: 40 },
+    { cv: document.getElementById('mascotPlay'), s: 9, ox: 20, oy: 40 },
+  ].filter(t => t.cv);
+  if (!targets.length) return;
   let step = 0;
   function paint() {
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    const s = 13;
-    drawJimothy(ctx, 22, 40, s, step);
+    for (const t of targets) {
+      const ctx = t.cv.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, t.cv.width, t.cv.height);
+      drawJimothy(ctx, t.ox, t.oy, t.s, step);
+    }
     step++;
   }
   paint();
