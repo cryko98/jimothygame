@@ -307,23 +307,28 @@
   function drawBush(b) { softShadow(b.x, b.y + b.r * 0.5, b.r, b.r * 0.4, 0.12); ctx.fillStyle = '#3f9142'; ctx.beginPath(); ctx.arc(b.x - b.r * 0.5, b.y, b.r * 0.6, 0, 6.283); ctx.arc(b.x + b.r * 0.5, b.y, b.r * 0.6, 0, 6.283); ctx.arc(b.x, b.y - b.r * 0.3, b.r * 0.7, 0, 6.283); ctx.fill(); ctx.fillStyle = '#4cae4f'; ellipse(b.x - b.r * 0.2, b.y - b.r * 0.2, b.r * 0.35, b.r * 0.35); }
   function drawButterfly(bf, t) { const flap = Math.abs(Math.sin(t / 90 + bf.phase)); ctx.fillStyle = bf.c; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.ellipse(bf.x - 3, bf.y, 3.4 * flap + 1, 4, -0.5, 0, 6.283); ctx.fill(); ctx.beginPath(); ctx.ellipse(bf.x + 3, bf.y, 3.4 * flap + 1, 4, 0.5, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = '#0f172a'; ctx.fillRect(bf.x - 0.6, bf.y - 3, 1.2, 6); }
 
-  // Smooth cartoon tree (round layered canopy) — NOT blocky
+  // Smooth cartoon tree with a visible trunk — NOT blocky
   function drawTree(tr, t) {
-    const sway = Math.sin(t / 900 + tr.x) * 2;
-    softShadow(tr.x, tr.y + tr.r * 0.34, tr.r * 0.9, tr.r * 0.3, 0.2);
-    ctx.fillStyle = '#6b4a2a'; roundedRect(tr.x - tr.r * 0.12, tr.y - tr.r * 0.5, tr.r * 0.24, tr.r * 0.55, 3);
-    ctx.fillStyle = '#7c5836'; ctx.fillRect(tr.x - tr.r * 0.12, tr.y - tr.r * 0.5, tr.r * 0.09, tr.r * 0.55);
-    const cx = tr.x + sway, cy = tr.y - tr.r * 0.7;
+    const r = tr.r, sway = Math.sin(t / 900 + tr.x) * 2;
+    const tw = r * 0.24, th = r * 0.82;               // trunk width / height
+    softShadow(tr.x, tr.y + 2, r * 0.8, r * 0.26, 0.2);
+    // trunk + little roots
+    ctx.fillStyle = '#5b3f24'; ellipse(tr.x - tw * 0.7, tr.y - 1, tw * 0.55, r * 0.07); ellipse(tr.x + tw * 0.7, tr.y - 1, tw * 0.55, r * 0.07);
+    ctx.fillStyle = '#6b4a2a'; roundedRect(tr.x - tw / 2, tr.y - th, tw, th, 3);
+    ctx.fillStyle = '#7c5836'; ctx.fillRect(tr.x - tw / 2, tr.y - th, tw * 0.4, th);  // lit edge
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(tr.x + tw * 0.1, tr.y - th, tw * 0.4, th);
+    // canopy sits ON TOP of the trunk (so the trunk shows below it)
+    const cx = tr.x + sway, cy = tr.y - th - r * 0.12;
     if (tr.snow) {
-      ctx.fillStyle = '#2f6b3a'; ellipse(cx, cy, tr.r * 0.82, tr.r * 0.78);
-      ctx.fillStyle = '#3a7d46'; ellipse(cx - tr.r * 0.3, cy - tr.r * 0.2, tr.r * 0.5, tr.r * 0.5);
-      ctx.fillStyle = '#eef5f9'; ellipse(cx + tr.r * 0.2, cy - tr.r * 0.35, tr.r * 0.4, tr.r * 0.32);
+      ctx.fillStyle = '#2f6b3a'; ellipse(cx, cy, r * 0.72, r * 0.66);
+      ctx.fillStyle = '#3a7d46'; ellipse(cx - r * 0.26, cy - r * 0.16, r * 0.44, r * 0.42);
+      ctx.fillStyle = '#eef5f9'; ellipse(cx + r * 0.18, cy - r * 0.3, r * 0.36, r * 0.28);
       return;
     }
-    ctx.fillStyle = '#3f8f2f'; ellipse(cx, cy, tr.r * 0.9, tr.r * 0.82);
-    ctx.fillStyle = '#4ea33a'; ellipse(cx - tr.r * 0.32, cy - tr.r * 0.14, tr.r * 0.55, tr.r * 0.52); ellipse(cx + tr.r * 0.34, cy + tr.r * 0.05, tr.r * 0.45, tr.r * 0.42);
-    ctx.fillStyle = '#5cb343'; ellipse(cx - tr.r * 0.12, cy - tr.r * 0.4, tr.r * 0.4, tr.r * 0.34);
-    ctx.fillStyle = 'rgba(255,255,255,0.10)'; ellipse(cx - tr.r * 0.4, cy - tr.r * 0.3, tr.r * 0.22, tr.r * 0.16);
+    ctx.fillStyle = '#3f8f2f'; ellipse(cx, cy, r * 0.82, r * 0.72);
+    ctx.fillStyle = '#4ea33a'; ellipse(cx - r * 0.3, cy - r * 0.12, r * 0.5, r * 0.46); ellipse(cx + r * 0.32, cy + r * 0.05, r * 0.42, r * 0.38);
+    ctx.fillStyle = '#5cb343'; ellipse(cx - r * 0.1, cy - r * 0.34, r * 0.36, r * 0.3);
+    ctx.fillStyle = 'rgba(255,255,255,0.10)'; ellipse(cx - r * 0.36, cy - r * 0.26, r * 0.2, r * 0.14);
   }
   // Smooth cartoon rock (rounded) — NOT blocky
   function drawRock(r) {
