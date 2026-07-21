@@ -267,6 +267,8 @@
   function buildFlowerPatch() { const g = new T.Group(); for (let i = 0; i < 5; i++) { const f = buildFlower([MAT.flower1, MAT.flower2][(Math.random() * 2) | 0]); f.position.set((Math.random() - 0.5) * 0.7, 0, (Math.random() - 0.5) * 0.7); g.add(f); } return g; }
   function buildRockCluster() { const g = new T.Group(); for (let i = 0; i < 3; i++) { const r = M(new T.DodecahedronGeometry(0.22 + Math.random() * 0.18, 0), i ? MAT.stoneDk : MAT.stone, true); r.position.set((Math.random() - 0.5) * 0.6, 0.16, (Math.random() - 0.5) * 0.6); r.rotation.set(Math.random(), Math.random(), Math.random()); g.add(r); } return g; }
   function buildCar() { const g = new T.Group(); const mat = CAR_MATS[(Math.random() * CAR_MATS.length) | 0]; const body = M(box(2.0, 0.5, 0.9), mat, true); body.position.y = 0.5; g.add(body); const cab = M(box(1.1, 0.44, 0.82), mat, true); cab.position.set(-0.1, 0.9, 0); g.add(cab); const glass = M(box(1.0, 0.36, 0.86), MAT.carGlass); glass.position.set(-0.1, 0.9, 0); g.add(glass); for (const [wx, wz] of [[-0.6, 0.48], [0.6, 0.48], [-0.6, -0.48], [0.6, -0.48]]) { const w = M(cyl(0.24, 0.24, 0.16, 12), MAT.carDark); w.rotation.x = Math.PI / 2; w.position.set(wx, 0.24, wz); g.add(w); } return g; }
+  // an oncoming car hazard for the city (front at -X, toward the runner, with headlights)
+  function buildCarHazard() { const g = buildCar(); g.scale.setScalar(1.15); for (const sz of [-0.34, 0.34]) { const hl = new T.Mesh(sph(0.12, 10, 8), MAT.lampGlow); hl.position.set(-1.02, 0.46, sz); g.add(hl); } const grille = M(box(0.06, 0.24, 0.6), MAT.metalDk); grille.position.set(-1.0, 0.4, 0); g.add(grille); return g; }
   function buildCone() { const g = new T.Group(); const c = M(new T.ConeGeometry(0.24, 0.6, 10), MAT.cone, true); c.position.y = 0.3; g.add(c); const band = M(cyl(0.19, 0.15, 0.1, 10), MAT.coneW); band.position.y = 0.34; g.add(band); const base = M(box(0.5, 0.06, 0.5), MAT.cone); base.position.y = 0.03; g.add(base); return g; }
   function buildMailbox() { const g = new T.Group(); const post = M(cyl(0.06, 0.06, 1.0, 6), MAT.metalDk); post.position.y = 0.5; g.add(post); const b = M(box(0.4, 0.4, 0.5), MAT.mailbox, true); b.position.y = 1.1; g.add(b); const top = M(cyl(0.2, 0.2, 0.5, 10, 1), MAT.mailbox); top.rotation.z = Math.PI / 2; top.position.y = 1.3; g.add(top); return g; }
   function buildPlanter() { const g = new T.Group(); const p = M(box(1.2, 0.4, 0.5), MAT.pot, true); p.position.y = 0.2; g.add(p); for (let i = 0; i < 3; i++) { const b = M(sph(0.26, 8, 6), MAT.bush); b.position.set((i - 1) * 0.35, 0.55, 0); g.add(b); const f = buildFlower(MAT.flower1); f.position.set((i - 1) * 0.35, 0.4, 0.1); g.add(f); } return g; }
@@ -362,7 +364,10 @@
     if (lastKind === 'pit') kind = Math.random() < 0.6 ? 'coins' : 'flat';
     else { const r = Math.random(); if (r < 0.19) kind = 'pit'; else if (r < 0.47) kind = 'obstacle'; else if (r < 0.65) kind = 'enemy'; else if (r < 0.85) kind = 'coins'; else if (r < 0.92) kind = 'food'; else kind = 'power'; }
     let gap = 7 + Math.random() * 4 - diff * 2;
-    if (kind === 'pit') { const w = 1.2 + Math.random() * (0.5 + diff * 0.6); const p = { x0: x - w / 2, x1: x + w / 2 }; const chasm = (b === 'city') ? buildPitCity(w) : buildPitForest(w); chasm.position.set(x, 0, 0); scene.add(chasm); p.chasm = chasm; pits.push(p); gap = w + 5 + Math.random() * 3; }
+    if (kind === 'pit') {
+      if (b === 'city') { const m = buildCarHazard(); const o = add(enemies, m, x, { ty: 'car', dead: false, vx: -4, run: 0, top: 1.05, hw: 0.95 }); o.sh = buildShadow(); scene.add(o.sh); gap = 9 + Math.random() * 4; }   // city: oncoming car instead of a manhole
+      else { const w = 1.2 + Math.random() * (0.5 + diff * 0.6); const p = { x0: x - w / 2, x1: x + w / 2 }; const chasm = buildPitForest(w); chasm.position.set(x, 0, 0); scene.add(chasm); p.chasm = chasm; pits.push(p); gap = w + 5 + Math.random() * 3; }
+    }
     else if (kind === 'obstacle') { const set = b === 'forest' ? ['log', 'rock', 'crate'] : ['bin', 'hydrant', 'crate']; const ty = set[(Math.random() * set.length) | 0]; const m = buildObstacle(ty); const o = add(obstacles, m, x); o.box = m.userData.box; o.sh = buildShadow(); o.sh.position.set(x, 0.02, 0); scene.add(o.sh); gap = 6 + Math.random() * 4 - diff * 1.5; }
     else if (kind === 'enemy') { const ty = (b === 'city' && Math.random() < 0.5) ? 'human' : 'dog'; const m = ty === 'dog' ? buildDog(MAT.dog, -1, false) : buildHuman(); const o = add(enemies, m, x, { ty, dead: false, vx: ty === 'dog' ? -3.2 : -2.4, run: 0, top: ty === 'human' ? 2.0 : 0.95, hw: ty === 'human' ? 0.34 : 0.5 }); o.sh = buildShadow(); scene.add(o.sh); gap = 8 + Math.random() * 4; }
     else if (kind === 'coins') { const n = 3 + ((Math.random() * 4) | 0), arc = Math.random() < 0.5; for (let i = 0; i < n; i++) { const m = buildCoin(); m.position.y = 1 + (arc ? Math.sin(i / (n - 1) * Math.PI) * 1.5 : 0.3); add(coins, m, x + i * 1.15); } gap = n * 1.15 + 5; }
@@ -465,7 +470,7 @@
     for (const e of enemies) { if (e.dead) continue; e.x += e.vx * dt; e.run += dt * 9; }
 
     for (let i = cans.length - 1; i >= 0; i--) { const c = cans[i]; c.x += c.vx * dt; c.vy -= GRAV * dt; c.y += c.vy * dt; c.mesh.position.set(c.x, c.y, LANE); c.mesh.rotation.z += dt * 14;
-      let hit = false; for (const e of enemies) if (!e.dead && Math.abs(e.x - c.x) < 0.75 && c.y < e.top + 0.3) { e.dead = true; hit = true; score += 15; puff(e.x, 0.9, 0xffd23f); scene.remove(e.mesh); if (e.sh) scene.remove(e.sh); }
+      let hit = false; for (const e of enemies) if (!e.dead && e.ty !== 'car' && Math.abs(e.x - c.x) < 0.75 && c.y < e.top + 0.3) { e.dead = true; hit = true; score += 15; puff(e.x, 0.9, 0xffd23f); scene.remove(e.mesh); if (e.sh) scene.remove(e.sh); }
       if (hit || c.y < 0 || c.x < player.x - 6) { scene.remove(c.mesh); cans.splice(i, 1); }
     }
 
