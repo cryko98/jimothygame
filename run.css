@@ -88,3 +88,28 @@ html, body { height: 100%; background: #b9e0f0; color: var(--ink); font-family: 
   .tbtn { width: 112px; height: 112px; bottom: 1.1rem; font-size: 1.05rem; }
 }
 @media (max-width: 480px) { .ctrl-strip span:nth-child(5) { display: none; } .home { font-size: .82rem; } }
+
+/* tournament panel */
+.tourney { width: 100%; background: #f2f6fb; border: 1px solid #d8e2ee; border-radius: 14px; padding: .9rem 1rem; display: flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
+.t-title { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--blue); font-weight: 700; }
+.t-desc { color: var(--muted); font-size: .88rem; text-align: left; margin: 0; }
+.btn.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); box-shadow: none; padding: .55rem 1.2rem; font-size: .92rem; }
+.btn.ghost:hover { background: var(--blue); color: #fff; }
+.t-status { font-size: .84rem; color: var(--accent); font-weight: 600; min-height: 1.1em; word-break: break-all; text-align: left; }
+
+/* notched phones: keep the HUD & buttons inside the safe area */
+@supports (padding: max(0px)) {
+  .hud { padding-left: max(.6rem, env(safe-area-inset-left)); padding-right: max(.6rem, env(safe-area-inset-right)); padding-top: max(.5rem, env(safe-area-inset-top)); }
+  .tbtn.jump { right: max(1.4rem, env(safe-area-inset-right)); bottom: max(1.6rem, env(safe-area-inset-bottom)); }
+  .tbtn.throw { left: max(1.4rem, env(safe-area-inset-left)); bottom: max(1.6rem, env(safe-area-inset-bottom)); }
+}
+
+/* short landscape phones: compact chrome, keep the play area clear */
+@media (max-height: 460px) {
+  .ctrl-strip { display: none; }
+  .metrics .m { font-size: .72rem; padding: .22rem .55rem; }
+  .card { padding: 1.1rem 1.2rem; gap: .6rem; max-height: 96vh; }
+  .card h1 { font-size: 1.3rem; }
+  .card > p, .keys, .tourney { display: none; }
+  .tbtn { width: 84px; height: 84px; bottom: .9rem; }
+}

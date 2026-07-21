@@ -18,7 +18,7 @@
     function noise(dur, peak, cutoff, when) { if (!ctx) return; const t = when || ctx.currentTime, n = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; const s = ctx.createBufferSource(); s.buffer = buf; const g = ctx.createGain(); g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur); }
     const LEAD = [0, 4, 7, 4, 5, 7, 9, 7, 0, 4, 7, 12, 11, 9, 7, 4], BASSN = [0, 0, 5, 5, 7, 7, 5, 3];
     const hz = (semi, base) => (base || 523.25) * Math.pow(2, semi / 12);
-    function tick() { if (!ctx || muted) return; const t = ctx.currentTime + 0.02; tone(hz(LEAD[step % LEAD.length]), 0.16, 'triangle', 0.16, musicGain, t); if (step % 2 === 0) tone(hz(BASSN[(step / 2) % BASSN.length], 130.81), 0.26, 'sine', 0.24, musicGain, t); if (step % 4 === 2) noise(0.05, 0.05, 6000, t); step++; }
+    function tick() { if (!ctx || muted || document.hidden) return; const t = ctx.currentTime + 0.02; tone(hz(LEAD[step % LEAD.length]), 0.16, 'triangle', 0.16, musicGain, t); if (step % 2 === 0) tone(hz(BASSN[(step / 2) % BASSN.length], 130.81), 0.26, 'sine', 0.24, musicGain, t); if (step % 4 === 2) noise(0.05, 0.05, 6000, t); step++; }
     return {
       start() { ensure(); if (!ctx) return; if (ctx.state === 'suspended') ctx.resume(); if (!seq) seq = setInterval(tick, 165); if (!muted) musicGain.gain.setTargetAtTime(0.13, ctx.currentTime, 0.6); },
       mute(m) { muted = m; if (musicGain && ctx) musicGain.gain.setTargetAtTime(m ? 0.0001 : 0.13, ctx.currentTime, 0.2); },
@@ -31,6 +31,47 @@
       bark() { if (muted || !ctx) return; for (let i = 0; i < 2; i++) { const w = ctx.currentTime + i * 0.17; slide(210, 90, 0.12, 'sawtooth', 0.17, w); noise(0.1, 0.11, 700, w); } },
     };
   })();
+
+  // ---- server layer (Vercel + Upstash) — graceful offline fallback ---------
+  // Anti-cheat model: the browser can never be fully trusted, so the SERVER is
+  // the authority. Each run gets a signed single-use token from /api/run-start;
+  // /api/run-submit re-validates duration, physics plausibility and the exact
+  // score formula before anything reaches the leaderboard.
+  const NET = (function () {
+    function jfetch(url, bodyObj, ms) {
+      return new Promise((resolve, reject) => {
+        const to = setTimeout(() => reject(new Error('timeout')), ms || 4000);
+        fetch(url, bodyObj ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyObj) } : undefined)
+          .then(r => { clearTimeout(to); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+          .then(resolve, e => { clearTimeout(to); reject(e); });
+      });
+    }
+    return {
+      online: false, wallet: null, entered: false, token: null,
+      check() { return jfetch('/api/lb').then(d => { this.online = true; return d; }).catch(() => { this.online = false; return null; }); },
+      runStart() { if (!this.online) return Promise.resolve(); return jfetch('/api/run-start', {}).then(d => { this.token = d.token; }).catch(() => { this.token = null; }); },
+      submit(p) { if (!this.online || !this.token) return Promise.resolve(null); const tok = this.token; this.token = null; return jfetch('/api/run-submit', Object.assign({ token: tok, wallet: this.wallet }, p)).catch(() => null); },
+      top() { return jfetch('/api/lb').catch(() => null); },
+    };
+  })();
+  async function connectWallet() {
+    const st = document.getElementById('tStatus'); const say = m => { if (st) st.textContent = m; };
+    try {
+      const ph = window.solana;
+      if (!ph || !ph.isPhantom) { say('Phantom wallet not found — install it first.'); return; }
+      if (!NET.online) { say('Tournament server is offline right now.'); return; }
+      say('Connecting…');
+      const conn = await ph.connect(); const pk = conn.publicKey.toString();
+      const n = await fetch('/api/t-nonce?pk=' + encodeURIComponent(pk)).then(r => r.json());
+      if (!n.nonce) { say(n.error || 'Could not get a nonce.'); return; }
+      say('Sign the message in Phantom…');
+      const sig = await ph.signMessage(new TextEncoder().encode(n.nonce), 'utf8');
+      let b = ''; for (const v of sig.signature) b += String.fromCharCode(v);
+      const res = await fetch('/api/t-join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pk, sig: btoa(b) }) }).then(r => r.json());
+      if (res.ok) { NET.wallet = pk; NET.entered = true; say('Entered as ' + pk.slice(0, 4) + '…' + pk.slice(-4) + (res.balance != null ? ' · balance ' + res.balance : '')); }
+      else say(res.error || 'Entry failed.');
+    } catch (e) { say('Cancelled or failed — try again.'); }
+  }
 
   const el = {
     dist: document.getElementById('distVal'), score: document.getElementById('scoreVal'), lives: document.getElementById('lives'),
@@ -285,6 +326,7 @@
     const N = 16, shape = new T.Shape();
     for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2; const rr = 0.74 + (Math.sin(i * 2.3) * 0.5 + 0.5) * 0.34; const px = Math.cos(a) * (w / 2) * rr, pz = Math.sin(a) * HOLE_HZ * 0.9 * rr; if (i === 0) shape.moveTo(px, pz); else shape.lineTo(px, pz); }
     const walls = new T.Mesh(new T.ExtrudeGeometry(shape, { depth: 4, bevelEnabled: false }), MAT.holeSide); walls.rotation.x = Math.PI / 2; walls.position.y = 0.02; g.add(walls);   // irregular hole with matching walls — no flat slab
+    const floor = new T.Mesh(new T.ShapeGeometry(shape), MAT.holeSide); floor.rotation.x = Math.PI / 2; floor.position.y = -3.9; g.add(floor);   // dark bottom so you never see the sky through the hole
     for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28; const rr = 1.03 + Math.sin(i * 1.7) * 0.1; const lump = M(new T.DodecahedronGeometry(0.14 + Math.random() * 0.12, 0), i % 2 ? MAT.rimDirt : MAT.stoneDk); lump.position.set(Math.cos(a) * (w / 2) * rr, 0.05, Math.sin(a) * HOLE_HZ * rr); lump.rotation.set(Math.random(), Math.random(), Math.random()); g.add(lump); }
     return g;
   }
@@ -310,6 +352,7 @@
   // ---- state ---------------------------------------------------------------
   let player, playerModel, chaser, chaserModel, deco, obstacles, enemies, coins, pickups, cans, particles, clouds;
   let scrollSpeed, lead, lives, coinsN, score, ammo, jumps, running, over, nextSpawn, lastKind, nextDeco, groundTiles, invuln, magnetT, speedT, shieldOn, stumbleT, shakeT, powerTO, coyoteT, jumpBuf, barkT;
+  let bonus, kills, thrownN, jumpsN, runT;   // run metrics (server-side plausibility checks)
   const LANE = 0, GRAV = 34, JUMP_V = 12.6, TILE = 1.5, HALF = 34, LANE_HZ = 3.1, HOLE_HZ = 1.0;
   let pits = [], curbL, curbR;
 
@@ -328,7 +371,9 @@
 
     scrollSpeed = 9; lead = 78; lives = 3; coinsN = 0; score = 0; ammo = 0; jumps = 0;
     nextSpawn = 26; lastKind = 'flat'; nextDeco = 8; invuln = 0; magnetT = 0; speedT = 0; shieldOn = false; stumbleT = 0; shakeT = 0; coyoteT = 0; jumpBuf = 0; barkT = 4;
+    bonus = 0; kills = 0; thrownN = 0; jumpsN = 0; runT = 0;
     running = true; over = false;
+    NET.runStart();   // signed single-use run token from the server (no-op offline)
     const nClouds = MOBILE ? 4 : 7;
     for (let i = 0; i < nClouds; i++) { const c = buildCloud(); const cx = i * 14, cz = -14 - Math.random() * 10, cy = 12 + Math.random() * 6; c.position.set(cx, cy, cz); scene.add(c); clouds.push({ mesh: c, x: cx, y: cy, z: cz }); }
     ensureGround(); renderLives(); setHUD();
@@ -404,11 +449,11 @@
   function doJump() {
     if (!running) return;
     const grounded = player.onGround || coyoteT > 0;
-    if (jumps === 0 && grounded) { player.vy = JUMP_V; jumps = 1; player.onGround = false; coyoteT = 0; AUDIO.jump(); }
-    else if (jumps === 1) { player.vy = JUMP_V * 0.92; jumps = 2; AUDIO.jump(); }
+    if (grounded) { player.vy = JUMP_V; jumps = 1; player.onGround = false; coyoteT = 0; jumpsN++; AUDIO.jump(); }
+    else if (jumps < 2) { player.vy = JUMP_V * 0.92; jumps = 2; jumpsN++; AUDIO.jump(); }   // air jump works even after walking off a ledge
     else { jumpBuf = 0.14; }   // buffered — fires the instant you land
   }
-  function doThrow() { if (!running || ammo <= 0) return; ammo--; setHUD(); AUDIO.thrw(); const m = buildCan(); add(cans, m, player.x + 0.6, { y: player.y + 1.1, vx: scrollSpeed + 9, vy: 3 }); m.position.set(player.x + 0.6, player.y + 1.1, LANE); }
+  function doThrow() { if (!running || ammo <= 0) return; ammo--; thrownN++; setHUD(); AUDIO.thrw(); const m = buildCan(); add(cans, m, player.x + 0.6, { y: player.y + 1.1, vx: scrollSpeed + 9, vy: 3 }); m.position.set(player.x + 0.6, player.y + 1.1, LANE); }
   window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === ' ' || k === 'arrowup' || k === 'w') { e.preventDefault(); doJump(); } else if (k === 'f' || k === 'arrowdown' || k === 's') { e.preventDefault(); doThrow(); } });
   canvas.addEventListener('mousedown', doJump);
   canvas.addEventListener('touchstart', e => { e.preventDefault(); doJump(); }, { passive: false });
@@ -462,7 +507,7 @@
     chaser.x += (targetX - chaser.x) * Math.min(1, dt * 6);
     chaser.vy -= GRAV * dt; chaser.y += chaser.vy * dt;
     if (!inPit(chaser.x + 0.4) && chaser.y <= 0) { chaser.y = 0; chaser.vy = 0; chaser.onGround = true; } else chaser.onGround = false;
-    if (chaser.onGround) { let hz = inPit(chaser.x + 1.6) || inPit(chaser.x + 2.4); for (const o of obstacles) if (Math.abs(o.x - (chaser.x + 1.9)) < 0.9) hz = true; if (hz) { chaser.vy = JUMP_V * 0.94; chaser.onGround = false; } chaser.run += scrollSpeed * dt * 1.6; }
+    if (chaser.onGround) { let hz = inPit(chaser.x + 1.6) || inPit(chaser.x + 2.4); for (const o of obstacles) if (Math.abs(o.x - (chaser.x + 1.9)) < 0.9) hz = true; for (const e of enemies) if (!e.dead && Math.abs(e.x - (chaser.x + 1.9)) < 1.0) hz = true; if (hz) { chaser.vy = JUMP_V * 0.94; chaser.onGround = false; } chaser.run += scrollSpeed * dt * 1.6; }
     if (chaser.y < -4) { chaser.x = player.x - 3; chaser.y = 0; chaser.vy = 0; }
     // dog catches you → lose a life, shove it back, refill the meter a bit
     if (lead <= 0) { lead = 62; chaser.x = player.x - 8; puff(player.x, player.y + 1, 0xc53a2f); if (loseLife('caught')) return; }
@@ -470,7 +515,7 @@
     for (const e of enemies) { if (e.dead) continue; e.x += e.vx * dt; e.run += dt * 9; }
 
     for (let i = cans.length - 1; i >= 0; i--) { const c = cans[i]; c.x += c.vx * dt; c.vy -= GRAV * dt; c.y += c.vy * dt; c.mesh.position.set(c.x, c.y, LANE); c.mesh.rotation.z += dt * 14;
-      let hit = false; for (const e of enemies) if (!e.dead && e.ty !== 'car' && Math.abs(e.x - c.x) < 0.75 && c.y < e.top + 0.3) { e.dead = true; hit = true; score += 15; puff(e.x, 0.9, 0xffd23f); scene.remove(e.mesh); if (e.sh) scene.remove(e.sh); }
+      let hit = false; for (const e of enemies) if (!e.dead && e.ty !== 'car' && Math.abs(e.x - c.x) < 0.75 && c.y < e.top + 0.3) { e.dead = true; hit = true; bonus += 15; kills++; puff(e.x, 0.9, 0xffd23f); scene.remove(e.mesh); if (e.sh) scene.remove(e.sh); }
       if (hit || c.y < 0 || c.x < player.x - 6) { scene.remove(c.mesh); cans.splice(i, 1); }
     }
 
@@ -480,7 +525,7 @@
 
     for (let i = coins.length - 1; i >= 0; i--) { const c = coins[i]; c.mesh.rotation.y += dt * 4;
       if (magnetT > 0 && Math.abs(c.x - player.x) < 4.5) { c.x += (player.x - c.x) * dt * 5; c.mesh.position.y += ((player.y + 1) - c.mesh.position.y) * dt * 5; }
-      if (Math.abs(c.x - player.x) < 0.7 && Math.abs(c.mesh.position.y - (player.y + 1)) < 1.3) { scene.remove(c.mesh); coins.splice(i, 1); coinsN++; score += 5; AUDIO.coin(); puff(c.x, c.mesh.position.y, 0xffd23f); }
+      if (Math.abs(c.x - player.x) < 0.7 && Math.abs(c.mesh.position.y - (player.y + 1)) < 1.3) { scene.remove(c.mesh); coins.splice(i, 1); coinsN++; AUDIO.coin(); puff(c.x, c.mesh.position.y, 0xffd23f); }
     }
     for (let i = pickups.length - 1; i >= 0; i--) { const p = pickups[i]; p.mesh.rotation.y += dt * 1.6; p.mesh.position.y = (p.kind === 'food' ? 0.7 : 1) + Math.sin(performance.now() / 300 + p.x) * 0.12;
       if (Math.abs(p.x - player.x) < 0.85 && player.y < 1.7) { scene.remove(p.mesh); pickups.splice(i, 1); applyPickup(p.kind); }
@@ -493,7 +538,8 @@
 
     for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.vy -= 12 * dt; p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt; p.life -= dt; if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); } }
 
-    score = Math.max(score, Math.floor(player.x) + coinsN * 5);
+    runT += dt;
+    score = Math.floor(player.x) + coinsN * 5 + bonus;   // one exact formula — the server re-checks this
     syncModels(dt); updateBiome(); setHUD();
   }
 
@@ -542,27 +588,57 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   function renderLB(node, hl) { const l = loadLB(); node.innerHTML = ''; if (!l.length) { const li = document.createElement('li'); li.className = 'lb-empty'; li.textContent = 'No runs yet — be the first!'; li.style.gridColumn = '1/-1'; node.appendChild(li); return; } l.forEach((r, i) => { const li = document.createElement('li'); if (i === hl) li.className = 'you'; li.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="sc">${r.score}</span>`; node.appendChild(li); }); }
 
+  // server top-10 → list node (used when the API is live)
+  function renderServerLB(node, rows, hlName) {
+    node.innerHTML = '';
+    if (!rows || !rows.length) { const li = document.createElement('li'); li.className = 'lb-empty'; li.textContent = 'No runs yet — be the first!'; li.style.gridColumn = '1/-1'; node.appendChild(li); return; }
+    rows.forEach(r => { const li = document.createElement('li'); if (hlName && r.name === hlName) li.className = 'you'; li.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="sc">${r.score}</span>`; node.appendChild(li); });
+  }
+
   // ---- lifecycle -----------------------------------------------------------
   let last = 0, pending = null;
-  function frame(now) { const dt = Math.min(0.04, (now - last) / 1000); last = now; if (running && !over && player) update(dt); if (player) renderer.render(scene, camera); requestAnimationFrame(frame); }
+  function frame(now) {
+    if (document.hidden) { last = now; requestAnimationFrame(frame); return; }   // pause while the tab is hidden
+    const dt = Math.min(0.04, (now - last) / 1000); last = now;
+    if (running && !over && player) update(dt);
+    if (player) renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
   function gameOver(reason) {
     if (over) return; over = true; running = false; if (playerModel) playerModel.visible = true;
-    const fs = Math.floor(player.x) + coinsN * 5;
+    const fs = score;   // includes treat + can-kill bonuses (same formula the server verifies)
     el.overTitle.textContent = reason === 'fell' ? 'Out of lives — down the hole!' : 'Out of lives — the dog got you!';
     el.fDist.textContent = Math.floor(player.x); el.fScore.textContent = fs;
-    const list = loadLB(); const q = list.length < 10 || fs > (list[list.length - 1] ? list[list.length - 1].score : 0);
-    pending = { score: fs, dist: Math.floor(player.x) }; el.nameRow.classList.toggle('hidden', !q || fs <= 0);
-    renderLB(el.lbOver, -1); el.over.classList.remove('hidden');
+    const list = loadLB(); const localQ = list.length < 10 || fs > (list[list.length - 1] ? list[list.length - 1].score : 0);
+    pending = { score: fs, dist: Math.floor(player.x), coins: coinsN, kills: kills, thrown: thrownN, jumps: jumpsN, dur: Math.round(runT * 10) / 10 };
+    el.nameRow.classList.toggle('hidden', fs <= 0 || !(NET.online || localQ));
+    if (NET.online) { NET.top().then(d => { if (d && d.top) renderServerLB(el.lbOver, d.top); else renderLB(el.lbOver, -1); }); } else renderLB(el.lbOver, -1);
+    el.over.classList.remove('hidden');
   }
-  function saveScore() { if (!pending) return; const name = (el.nameInput.value || 'Jimothy').slice(0, 12); const l = loadLB(); l.push({ name, score: pending.score, dist: pending.dist }); l.sort((a, b) => b.score - a.score); saveLB(l); renderLB(el.lbOver, l.findIndex(r => r.name === name && r.score === pending.score)); el.nameRow.classList.add('hidden'); pending = null; try { localStorage.setItem('jimothy_run_name', name); } catch (e) {} }
+  function saveScore() {
+    if (!pending) return; const p = pending; pending = null;
+    const name = (el.nameInput.value || 'Jimothy').replace(/[^\w \-.]/g, '').slice(0, 12) || 'Jimothy';
+    const l = loadLB(); l.push({ name, score: p.score, dist: p.dist }); l.sort((a, b) => b.score - a.score); saveLB(l);
+    el.nameRow.classList.add('hidden');
+    try { localStorage.setItem('jimothy_run_name', name); } catch (e) {}
+    if (NET.online) { NET.submit(Object.assign({ name }, p)).then(d => { if (d && d.top) renderServerLB(el.lbOver, d.top, name); else renderLB(el.lbOver, l.findIndex(r => r.name === name && r.score === p.score)); }); }
+    else renderLB(el.lbOver, l.findIndex(r => r.name === name && r.score === p.score));
+  }
   el.saveBtn.addEventListener('click', saveScore); el.nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveScore(); });
   function startRun() { AUDIO.start(); el.start.classList.add('hidden'); el.over.classList.add('hidden'); reset(); }
   el.playBtn.addEventListener('click', startRun); el.retryBtn.addEventListener('click', startRun);
   if (el.muteBtn) el.muteBtn.addEventListener('click', () => { const m = AUDIO.toggle(); el.muteBtn.classList.toggle('off', m); });
+  const wBtn = document.getElementById('walletBtn'); if (wBtn) wBtn.addEventListener('click', connectWallet);
+  document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
   try { const nm = localStorage.getItem('jimothy_run_name'); if (nm) el.nameInput.value = nm; } catch (e) {}
   reset(); running = false; over = false; syncModels(); renderLB(el.lbStart, -1);
+  NET.check().then(d => { if (d && d.top) { renderServerLB(el.lbStart, d.top); const t = document.querySelectorAll('.lb-title'); t.forEach(x => { x.textContent = 'Global leaderboard'; }); } });
   requestAnimationFrame(frame);
 
-  window.RUN3D = { state: function () { return { x: Math.round(player.x), lead: Math.round(lead), lives: lives, score: score, coins: coinsN, ammo: ammo, obstacles: obstacles.length, enemies: enemies.length, pits: pits.length, deco: deco.length, y: +player.y.toFixed(2), onGround: player.onGround, chaserX: +chaser.x.toFixed(1), over: over }; }, give: function (k) { applyPickup(k); }, setLead: function (v) { lead = v; }, hit: function () { takeHit(); }, mobile: MOBILE };
+  // Dev-only inspection hook. NEVER shipped on a real host: the production build
+  // exposes nothing, and the server re-validates every submitted run anyway.
+  if (/^(localhost|127\.)/.test(location.hostname)) {
+    window.RUN3D = { state: function () { return { x: Math.round(player.x), lead: Math.round(lead), lives: lives, score: score, coins: coinsN, kills: kills, y: +player.y.toFixed(2), onGround: player.onGround, chaserX: +chaser.x.toFixed(1), over: over, online: NET.online }; }, mobile: MOBILE };
+  }
 })();
