@@ -144,6 +144,8 @@ a:hover { text-decoration: underline; }
 .feature-list li { color: var(--muted); padding: .45rem 0 .45rem 1.6rem; position: relative; font-size: 1.05rem; }
 .feature-list li::before { content: ""; position: absolute; left: 0; top: .95rem; width: .55rem; height: .55rem; border-radius: 50%; background: var(--accent); }
 .feature-list b { color: var(--ink); font-weight: 600; }
+.play-btns { display: flex; gap: .8rem; flex-wrap: wrap; }
+.tagbeta { font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; background: var(--accent); color: #fff; padding: .1rem .35rem; border-radius: 5px; margin-left: .1rem; vertical-align: middle; }
 .note { color: var(--muted); margin-top: 1rem; font-size: .95rem; }
 
 /* ---------- Stats (tokenomics) ---------- */
