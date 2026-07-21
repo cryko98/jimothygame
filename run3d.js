@@ -127,7 +127,6 @@
     eyePair(head, 0.3, 0.06, 0.19, 0.1, MAT.eyeP);  // big bright eyes with pupils
     // happy: eye highlights, rosy cheeks, a smiling mouth
     for (const sz of [-1, 1]) { const hiDot = M(sph(0.035, 6, 6), MAT.hi); hiDot.position.set(0.37, 0.11, sz * 0.19); head.add(hiDot); const ck = M(sph(0.08, 8, 6), MAT.cheek); ck.scale.set(1, 0.7, 0.55); ck.position.set(0.26, -0.16, sz * 0.3); head.add(ck); }
-    const smile = M(new T.TorusGeometry(0.1, 0.022, 6, 12, Math.PI), MAT.smile); smile.position.set(0.46, -0.2, 0.16); smile.rotation.z = Math.PI; head.add(smile);
     return g;
   }
 
@@ -196,7 +195,27 @@
     g.userData.box = bx; return g;
   }
 
-  function buildCoin() { const g = new T.Group(); const m = M(cyl(0.32, 0.32, 0.08, 20), MAT.gold, true); m.rotation.x = Math.PI / 2; g.add(m); const rim = M(new T.TorusGeometry(0.32, 0.045, 8, 22), MAT.goldEdge); g.add(rim); g.position.y = 1; return g; }
+  Object.assign(MAT, { cheese: L('#f2c14a'), crust: L('#d69a54'), pepper: L('#c0392b'), apple: L('#d8382f'), appleDk: L('#a52a26'), stem: L('#6b4a2a'), donut: L('#b06a3a'), icing: L('#f28fb0') });
+  // collectible treats (pizza slice, apple, donut) instead of coins
+  function buildCoin() {
+    const g = new T.Group(); const r = Math.random();
+    if (r < 0.4) {
+      const shape = new T.Shape(); shape.moveTo(0, 0); shape.lineTo(0.5, 0.18); shape.lineTo(0.5, -0.18); shape.lineTo(0, 0);
+      const slice = M(new T.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false }), MAT.cheese, true); slice.rotation.x = Math.PI / 2; slice.position.set(-0.24, 0.04, 0.04); g.add(slice);
+      const crust = M(cyl(0.06, 0.06, 0.36, 6), MAT.crust); crust.rotation.x = Math.PI / 2; crust.position.set(0.26, 0.04, 0); g.add(crust);
+      for (const [px, pz] of [[0.02, 0.03], [0.16, -0.05], [0.1, 0.08]]) { const pep = M(sph(0.045, 6, 5), MAT.pepper); pep.position.set(px, 0.1, pz); g.add(pep); }
+    } else if (r < 0.72) {
+      const a = M(sph(0.26, 12, 10), MAT.apple, true); a.scale.set(1, 0.94, 1); g.add(a);
+      const dent = M(sph(0.09, 8, 6), MAT.appleDk); dent.position.set(0, 0.23, 0); g.add(dent);
+      const stem = M(cyl(0.02, 0.02, 0.12, 5), MAT.stem); stem.position.set(0.02, 0.3, 0); g.add(stem);
+      const leaf = M(sph(0.09, 6, 5), MAT.leaf2); leaf.scale.set(1, 0.3, 0.5); leaf.position.set(0.11, 0.31, 0); leaf.rotation.z = 0.4; g.add(leaf);
+    } else {
+      const d = M(new T.TorusGeometry(0.22, 0.1, 10, 18), MAT.donut, true); d.rotation.x = Math.PI / 2; g.add(d);
+      const ice = M(new T.TorusGeometry(0.22, 0.085, 10, 18), MAT.icing); ice.rotation.x = Math.PI / 2; ice.position.y = 0.05; g.add(ice);
+      for (let i = 0; i < 7; i++) { const s = M(box(0.05, 0.02, 0.02), [MAT.flower1, MAT.flower2, MAT.can][i % 3]); const a = i / 7 * 6.28; s.position.set(Math.cos(a) * 0.22, 0.11, Math.sin(a) * 0.22); s.rotation.y = i; g.add(s); }
+    }
+    g.position.y = 1; return g;
+  }
 
   // ---- clear power-ups: distinct shape + floating label -------------------
   function makeLabel(text, color) {
@@ -254,22 +273,30 @@
   function buildRoadSign() { const g = new T.Group(); const post = M(cyl(0.05, 0.05, 1.6, 6), MAT.metal); post.position.y = 0.8; g.add(post); const s = M(box(0.5, 0.5, 0.06), [MAT.sign1, MAT.sign2, MAT.sign3][(Math.random() * 3) | 0]); s.position.y = 1.5; g.add(s); return g; }
   function buildTreeLine() { const g = new T.Group(); for (let i = 0; i < 6; i++) { const t = Math.random() < 0.5 ? buildPine() : buildTree(); t.scale.setScalar(0.8 + Math.random() * 0.7); t.position.set((i - 3) * 2.4 + Math.random(), 0, (Math.random() - 0.5) * 4); g.add(t); } return g; }
   // ---- themed gaps ---------------------------------------------------------
+  // keep the road/path on both sides — only the centre strip is open (hole sits in the middle)
+  function pitPanels(g) {
+    const pw = LANE_HZ - HOLE_HZ, pz = HOLE_HZ + pw / 2;
+    for (const sz of [-1, 1]) { const top = new T.Mesh(box(2.4, 0.3, pw), MAT.road); top.position.set(0, -0.16, sz * pz); g.add(top); const dirt = new T.Mesh(box(2.4, 2.6, pw), MAT.dirt); dirt.position.set(0, -1.6, sz * pz); g.add(dirt); }
+  }
   function buildPitForest(w) {
-    const g = new T.Group();
-    const deep = new T.Mesh(box(w, 7, LANE_HZ * 2), MAT.holeDk); deep.position.y = -4.1; g.add(deep);   // top well below the surface — no rectangle
-    const N = 18; const shape = new T.Shape();
-    for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2; const rr = 0.72 + (Math.sin(i * 2.3) * 0.5 + 0.5) * 0.4; const px = Math.cos(a) * (w / 2) * rr, pz = Math.sin(a) * LANE_HZ * 0.92 * rr; if (i === 0) shape.moveTo(px, pz); else shape.lineTo(px, pz); }
-    const hole = new T.Mesh(new T.ShapeGeometry(shape), MAT.holeDk); hole.rotation.x = -Math.PI / 2; hole.position.y = 0.03; g.add(hole);
-    for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28; const rr = 0.9 + Math.sin(i * 1.7) * 0.12; const lump = M(new T.DodecahedronGeometry(0.16 + Math.random() * 0.14, 0), i % 2 ? MAT.rimDirt : MAT.stoneDk); lump.position.set(Math.cos(a) * (w / 2) * rr, 0.04, Math.sin(a) * LANE_HZ * 0.95 * rr); lump.rotation.set(Math.random(), Math.random(), Math.random()); g.add(lump); }
-    for (let i = 0; i < 3; i++) { const root = M(cyl(0.03, 0.05, 0.5, 5), MAT.root); root.position.set((Math.random() - 0.5) * w * 0.6, 0.02, (Math.random() - 0.5) * LANE_HZ); root.rotation.set(1.2, Math.random() * 3, 0.4); g.add(root); }
+    const g = new T.Group(); pitPanels(g);
+    const N = 16, shape = new T.Shape();
+    for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2; const rr = 0.74 + (Math.sin(i * 2.3) * 0.5 + 0.5) * 0.34; const px = Math.cos(a) * (w / 2) * rr, pz = Math.sin(a) * HOLE_HZ * 0.9 * rr; if (i === 0) shape.moveTo(px, pz); else shape.lineTo(px, pz); }
+    const walls = new T.Mesh(new T.ExtrudeGeometry(shape, { depth: 4, bevelEnabled: false }), MAT.holeSide); walls.rotation.x = Math.PI / 2; walls.position.y = 0.02; g.add(walls);   // irregular hole with matching walls — no flat slab
+    for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28; const rr = 1.03 + Math.sin(i * 1.7) * 0.1; const lump = M(new T.DodecahedronGeometry(0.14 + Math.random() * 0.12, 0), i % 2 ? MAT.rimDirt : MAT.stoneDk); lump.position.set(Math.cos(a) * (w / 2) * rr, 0.05, Math.sin(a) * HOLE_HZ * rr); lump.rotation.set(Math.random(), Math.random(), Math.random()); g.add(lump); }
     return g;
   }
   function buildPitCity(w) {
-    // an open round manhole: a dark shaft you can see into, framed by a metal rim (no cover)
-    const g = new T.Group();
-    const shaft = new T.Mesh(new T.CylinderGeometry(1, 1, 6, 22, 1, true), MAT.holeSide); shaft.scale.set(w / 2 + 0.02, 1, LANE_HZ * 0.86); shaft.position.y = -2.9; g.add(shaft);
-    const bottom = new T.Mesh(new T.CircleGeometry(1, 20), MAT.holeDk); bottom.rotation.x = -Math.PI / 2; bottom.scale.set(w / 2, LANE_HZ * 0.86, 1); bottom.position.y = -2.3; g.add(bottom);
-    const rim = M(new T.TorusGeometry(1, 0.09, 8, 24), MAT.coverMetal); rim.rotation.x = Math.PI / 2; rim.scale.set(w / 2 + 0.06, LANE_HZ * 0.9, 1); rim.position.y = 0.05; g.add(rim);
+    const g = new T.Group(); pitPanels(g);
+    const rx = Math.min(w / 2, HOLE_HZ * 0.92), rz = HOLE_HZ * 0.9;   // small round hole, centred (does not fill the road)
+    const shaft = new T.Mesh(new T.CylinderGeometry(1, 1, 6, 24, 1, true), MAT.holeSide); shaft.scale.set(rx, 1, rz); shaft.position.y = -2.9; g.add(shaft);
+    const bottom = new T.Mesh(new T.CircleGeometry(1, 22), MAT.holeDk); bottom.rotation.x = -Math.PI / 2; bottom.scale.set(rx, rz, 1); bottom.position.y = -2.5; g.add(bottom);
+    const rim = M(new T.TorusGeometry(1, 0.08, 8, 24), MAT.coverMetal); rim.rotation.x = Math.PI / 2; rim.scale.set(rx + 0.06, rz + 0.06, 1); rim.position.y = 0.05; g.add(rim);
+    // the round cover lying flat on the road beside the hole
+    const cover = new T.Group(); cover.position.set(0, 0.05, HOLE_HZ + (LANE_HZ - HOLE_HZ) / 2); cover.rotation.z = 0.05;
+    const disc = M(cyl(rz * 0.92, rz * 0.92, 0.07, 22), MAT.coverMetal, true); cover.add(disc);
+    for (let r = 0.24; r < rz * 0.75; r += 0.22) { const ring = M(new T.TorusGeometry(r, 0.02, 5, 18), MAT.metalDk); ring.rotation.x = Math.PI / 2; ring.position.y = 0.04; cover.add(ring); }
+    g.add(cover);
     return g;
   }
   function buildShadow() { const m = new T.Mesh(new T.CircleGeometry(0.6, 16), new T.MeshBasicMaterial({ color: 0x1a2410, transparent: true, opacity: 0.24 })); m.rotation.x = -Math.PI / 2; m.position.y = 0.02; return m; }
@@ -281,7 +308,7 @@
   // ---- state ---------------------------------------------------------------
   let player, playerModel, chaser, chaserModel, deco, obstacles, enemies, coins, pickups, cans, particles, clouds;
   let scrollSpeed, lead, lives, coinsN, score, ammo, jumps, running, over, nextSpawn, lastKind, nextDeco, groundTiles, invuln, magnetT, speedT, shieldOn, stumbleT, shakeT, powerTO, coyoteT, jumpBuf, barkT;
-  const LANE = 0, GRAV = 34, JUMP_V = 12.6, TILE = 1.5, HALF = 34, LANE_HZ = 3.1;
+  const LANE = 0, GRAV = 34, JUMP_V = 12.6, TILE = 1.5, HALF = 34, LANE_HZ = 3.1, HOLE_HZ = 1.0;
   let pits = [], curbL, curbR;
 
   function clr(arr) { for (const o of arr) scene.remove(o.mesh || o); arr.length = 0; }
