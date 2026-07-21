@@ -25,6 +25,8 @@ html, body { height: 100%; background: #b9e0f0; color: var(--ink); font-family: 
 .lives .heart { width: 18px; height: 18px; display: inline-block; }
 .lives .heart svg { width: 100%; height: 100%; display: block; }
 .lives .heart.off { opacity: .28; filter: grayscale(1); }
+.mutebtn { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; width: 30px; height: 30px; font-size: 1rem; color: var(--accent); cursor: pointer; box-shadow: 0 4px 14px rgba(20,30,40,.1); display: flex; align-items: center; justify-content: center; }
+.mutebtn.off { color: var(--muted); text-decoration: line-through; }
 
 .ctrl-strip { position: fixed; top: 3.1rem; left: 50%; transform: translateX(-50%); z-index: 14; display: flex; align-items: center; gap: .55rem; background: rgba(27,36,48,.62); color: #fff; padding: .35rem .95rem; border-radius: 999px; font-size: .82rem; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.18); white-space: nowrap; max-width: 94vw; overflow: hidden; }
 .ctrl-strip b { color: #ffe08a; }
