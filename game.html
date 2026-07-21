@@ -3,76 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Play — Jimothy's Adventures</title>
+  <title>Jimothy Run — Jimothy's Adventures</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="game.css" />
+  <link rel="stylesheet" href="run.css" />
 </head>
 <body>
-  <canvas id="world"></canvas>
+  <canvas id="game"></canvas>
 
-  <!-- Top bar -->
-  <div class="game-bar">
-    <a class="home" href="index.html">Back to site</a>
-    <span class="logo">Jimothy's Adventures</span>
-    <span class="clock" id="clock"><span class="clock-orb" id="clockOrb"></span><b id="clockLabel">Day</b></span>
-    <span class="paws">In paws <b id="pawCount">0</b></span>
-    <span class="coins">Banked <b id="coinCount">0</b></span>
+  <!-- HUD -->
+  <div class="hud" id="hud">
+    <a class="home" href="index.html">Back</a>
+    <div class="metrics">
+      <span class="m">Distance <b id="distVal">0</b> m</span>
+      <span class="m score">Score <b id="scoreVal">0</b></span>
+    </div>
+    <div class="right">
+      <div class="lead"><span class="lead-icon">Dog</span><div class="lead-bar"><div class="lead-fill" id="leadFill"></div></div></div>
+      <div class="ammo" id="ammo"><span id="ammoVal">0</span> cans</div>
+    </div>
   </div>
-
-  <!-- Quest tracker -->
-  <div class="quest" id="quest">
-    <div class="q-title">Current Quest</div>
-    <div class="q-name" id="qName">—</div>
-    <div class="q-obj" id="qObj">Talk to Rocky in the clearing.</div>
-  </div>
-
-  <!-- Dialog -->
-  <div class="dialog" id="dialog">
-    <div class="who" id="dWho">Rocky</div>
-    <div class="line" id="dLine"></div>
-    <div class="hint">Press E / Space / tap ACT to continue</div>
-  </div>
+  <div class="power" id="powerBadge"></div>
 
   <!-- Mobile controls -->
   <div class="touch" id="touch">
-    <div class="dpad">
-      <button class="up" data-dir="up">&#9650;</button>
-      <button class="down" data-dir="down">&#9660;</button>
-      <button class="left" data-dir="left">&#9664;</button>
-      <button class="right" data-dir="right">&#9654;</button>
-    </div>
-    <button class="act" id="actBtn">ACT</button>
+    <button class="tbtn jump" id="jumpBtn">JUMP</button>
+    <button class="tbtn throw" id="throwBtn">THROW</button>
   </div>
 
-  <!-- Intro overlay -->
-  <div class="overlay" id="intro">
-    <div class="overlay-card">
-      <h1>Jimothy's Adventures</h1>
-      <p>The Trash Pack needs help. Explore the world, talk to Rocky, complete quests and collect JIMO coins. Short spine, big heart.</p>
-      <div class="controls-hint">
-        <span>Move: WASD / Arrows</span>
-        <span>Interact / shoo dogs: E</span>
-        <span>Mobile: on-screen pad</span>
+  <!-- Start overlay -->
+  <div class="overlay" id="start">
+    <div class="card">
+      <h1>Jimothy Run</h1>
+      <p>Run for your life through the woods and the city. Jump the gaps, dodge the dogs and people, grab snacks to keep ahead of the hound — and lob a can at anything in your way.</p>
+      <div class="keys">
+        <span><b>Jump</b> Space / Up / tap</span>
+        <span><b>Throw</b> F / Down / button</span>
       </div>
-      <div class="skins">
-        <span class="skins-label">Choose your skin</span>
-        <div class="skin-row" id="skinRow"></div>
+      <button class="btn" id="playBtn">Run!</button>
+      <div class="lb">
+        <div class="lb-title">Leaderboard</div>
+        <ol class="lb-list" id="lbStart"></ol>
       </div>
-      <button class="btn" id="playBtn">Start Adventure</button>
     </div>
   </div>
 
-  <!-- Win overlay -->
-  <div class="overlay hidden" id="win">
-    <div class="overlay-card">
-      <h1>Adventure Complete</h1>
-      <p id="winText">You reunited the Trash Pack and hauled home a mountain of JIMO. Jimothy is proud of you.</p>
-      <button class="btn" id="replayBtn">Play Again</button>
+  <!-- Game over overlay -->
+  <div class="overlay hidden" id="over">
+    <div class="card">
+      <h1 id="overTitle">The dog got you!</h1>
+      <div class="final"><span>Distance <b id="fDist">0</b> m</span><span>Score <b id="fScore">0</b></span></div>
+      <div class="namerow hidden" id="nameRow">
+        <span class="nr-label">New high score! Enter a name:</span>
+        <div class="nr-input"><input id="nameInput" maxlength="12" value="Jimothy" /><button class="btn small" id="saveBtn">Save</button></div>
+      </div>
+      <div class="lb">
+        <div class="lb-title">Leaderboard</div>
+        <ol class="lb-list" id="lbOver"></ol>
+      </div>
+      <button class="btn" id="retryBtn">Run again</button>
     </div>
   </div>
 
-  <script src="game-adventure.js"></script>
+  <script src="run.js"></script>
 </body>
 </html>
