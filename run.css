@@ -95,7 +95,15 @@ html, body { height: 100%; background: #b9e0f0; color: var(--ink); font-family: 
 .t-desc { color: var(--muted); font-size: .88rem; text-align: left; margin: 0; }
 .btn.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); box-shadow: none; padding: .55rem 1.2rem; font-size: .92rem; }
 .btn.ghost:hover { background: var(--blue); color: #fff; }
-.t-status { font-size: .84rem; color: var(--accent); font-weight: 600; min-height: 1.1em; word-break: break-all; text-align: left; }
+.t-status { font-size: .84rem; color: var(--accent); font-weight: 600; min-height: 1.1em; word-break: break-word; text-align: left; }
+.t-row { display: flex; gap: .5rem; width: 100%; flex-wrap: wrap; }
+.t-row input { flex: 1 1 140px; min-width: 0; font-family: inherit; font-size: .95rem; padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 999px; outline: none; }
+.t-row input:focus { border-color: var(--blue); }
+.pot { width: 100%; font-size: .85rem; font-weight: 700; color: var(--ink); background: #fff7e0; border: 1px solid #f0e0b0; border-radius: 10px; padding: .45rem .7rem; text-align: left; min-height: 1.2em; }
+.pot:empty { display: none; }
+.btn.p2e { background: var(--gold); color: #3a2a00; box-shadow: 0 8px 20px rgba(224,169,43,.3); width: 100%; }
+.btn.p2e:hover { background: #eab63a; }
+.btn.p2e.hidden, .hidden.btn { display: none; }
 
 /* notched phones: keep the HUD & buttons inside the safe area */
 @supports (padding: max(0px)) {

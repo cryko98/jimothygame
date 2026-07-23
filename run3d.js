@@ -47,30 +47,80 @@
       });
     }
     return {
-      online: false, wallet: null, entered: false, token: null,
+      online: false, wallet: null, entered: false, token: null, paidNext: null, paidRun: false, uname: null,
       check() { return jfetch('/api/lb').then(d => { this.online = true; return d; }).catch(() => { this.online = false; return null; }); },
-      runStart() { if (!this.online) return Promise.resolve(); return jfetch('/api/run-start', {}).then(d => { this.token = d.token; }).catch(() => { this.token = null; }); },
+      runStart() {
+        this.paidRun = false;
+        if (this.paidNext) { this.token = this.paidNext; this.paidNext = null; this.paidRun = true; return Promise.resolve(); }
+        if (!this.online) return Promise.resolve();
+        return jfetch('/api/run-start', {}).then(d => { this.token = d.token; }).catch(() => { this.token = null; });
+      },
       submit(p) { if (!this.online || !this.token) return Promise.resolve(null); const tok = this.token; this.token = null; return jfetch('/api/run-submit', Object.assign({ token: tok, wallet: this.wallet }, p)).catch(() => null); },
-      top() { return jfetch('/api/lb').catch(() => null); },
+      top(t) { return jfetch('/api/lb' + (t ? '?t=1' : '')).catch(() => null); },
     };
   })();
+  const tSay = m => { const st = document.getElementById('tStatus'); if (st) st.textContent = m; };
   async function connectWallet() {
-    const st = document.getElementById('tStatus'); const say = m => { if (st) st.textContent = m; };
     try {
       const ph = window.solana;
-      if (!ph || !ph.isPhantom) { say('Phantom wallet not found — install it first.'); return; }
-      if (!NET.online) { say('Tournament server is offline right now.'); return; }
-      say('Connecting…');
+      if (!ph || !ph.isPhantom) { tSay('Phantom wallet not found — install it first.'); return; }
+      if (!NET.online) { tSay('Tournament server is offline right now.'); return; }
+      const nameInp = document.getElementById('tName');
+      const uname = (nameInp && nameInp.value || '').replace(/[^\w \-.]/g, '').trim();
+      if (uname.length < 2) { tSay('Pick a username first (min 2 characters).'); if (nameInp) nameInp.focus(); return; }
+      tSay('Connecting…');
       const conn = await ph.connect(); const pk = conn.publicKey.toString();
       const n = await fetch('/api/t-nonce?pk=' + encodeURIComponent(pk)).then(r => r.json());
-      if (!n.nonce) { say(n.error || 'Could not get a nonce.'); return; }
-      say('Sign the message in Phantom…');
+      if (!n.nonce) { tSay(n.error || 'Could not get a nonce.'); return; }
+      tSay('Sign the message in Phantom…');
       const sig = await ph.signMessage(new TextEncoder().encode(n.nonce), 'utf8');
       let b = ''; for (const v of sig.signature) b += String.fromCharCode(v);
-      const res = await fetch('/api/t-join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pk, sig: btoa(b) }) }).then(r => r.json());
-      if (res.ok) { NET.wallet = pk; NET.entered = true; say('Entered as ' + pk.slice(0, 4) + '…' + pk.slice(-4) + (res.balance != null ? ' · balance ' + res.balance : '')); }
-      else say(res.error || 'Entry failed.');
-    } catch (e) { say('Cancelled or failed — try again.'); }
+      const res = await fetch('/api/t-join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pk, sig: btoa(b), name: uname }) }).then(r => r.json());
+      if (res.ok) {
+        NET.wallet = pk; NET.entered = true; NET.uname = res.name || uname;
+        try { localStorage.setItem('jimothy_run_name', NET.uname); } catch (e) {}
+        tSay('Entered as ' + NET.uname + ' (' + pk.slice(0, 4) + '…' + pk.slice(-4) + ')' + (res.balance != null ? ' · balance ' + res.balance : ''));
+        const pb = document.getElementById('p2eBtn'); if (pb) pb.classList.remove('hidden');
+      } else tSay(res.error || 'Entry failed.');
+    } catch (e) { tSay('Cancelled or failed — try again.'); }
+  }
+  // ---- P2E paid run: 0.05 SOL entry → hourly winner takes the pot ----------
+  let paying = false;
+  async function payAndRun() {
+    if (paying) return; paying = true;
+    try {
+      const ph = window.solana, sw = window.solanaWeb3;
+      if (!NET.entered || !ph || !sw) { tSay('Connect your wallet first.'); return; }
+      tSay('Preparing payment…');
+      const cfg = await fetch('/api/t-config').then(r => r.json());
+      if (!cfg.ok) { tSay(cfg.error || 'Config unavailable.'); return; }
+      const from = new sw.PublicKey(NET.wallet), to = new sw.PublicKey(cfg.prizeWallet);
+      const tx = new sw.Transaction({ recentBlockhash: cfg.blockhash, feePayer: from });
+      tx.add(sw.SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports: Math.round(cfg.feeSol * 1e9) }));
+      tSay('Approve the ' + cfg.feeSol + ' SOL entry in Phantom…');
+      const sent = await ph.signAndSendTransaction(tx);
+      tSay('Confirming payment…');
+      for (let i = 0; i < 20; i++) {
+        const r = await fetch('/api/t-pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pk: NET.wallet, sig: sent.signature }) }).then(x => x.json()).catch(() => null);
+        if (r && r.ok) { NET.paidNext = r.token; tSay('Paid! Good luck — this run counts for the pot.'); startRun(); return; }
+        if (r && r.error && r.error !== 'not confirmed yet') { tSay(r.error); return; }
+        await new Promise(rs => setTimeout(rs, 2500));
+      }
+      tSay('Payment not confirmed yet — wait a moment and press P2E Run again (it will not charge twice).');
+    } catch (e) { tSay('Payment cancelled or failed.'); }
+    finally { paying = false; }
+  }
+  // live pot display
+  async function pollPot() {
+    if (!NET.online) return;
+    const elp = document.getElementById('potLine'); if (!elp) return;
+    const d = await fetch('/api/pot').then(r => r.json()).catch(() => null);
+    if (!d || !d.ok) return;
+    const mm = Math.floor(d.nextPayoutMs / 60000), ss = Math.floor((d.nextPayoutMs % 60000) / 1000);
+    let txt = 'Pot: ' + d.potSol + ' SOL · payout in ' + mm + ':' + String(ss).padStart(2, '0');
+    if (d.leader) txt += ' · leading: ' + d.leader.name + ' (' + d.leader.score + ')';
+    if (d.winners && d.winners[0]) txt += ' · last winner: ' + (d.winners[0].name || 'anon') + ' +' + d.winners[0].amountSol + ' SOL';
+    elp.textContent = txt;
   }
 
   const el = {
@@ -611,7 +661,17 @@
     el.fDist.textContent = Math.floor(player.x); el.fScore.textContent = fs;
     const list = loadLB(); const localQ = list.length < 10 || fs > (list[list.length - 1] ? list[list.length - 1].score : 0);
     pending = { score: fs, dist: Math.floor(player.x), coins: coinsN, kills: kills, thrown: thrownN, jumps: jumpsN, dur: Math.round(runT * 10) / 10 };
-    el.nameRow.classList.toggle('hidden', fs <= 0 || !(NET.online || localQ));
+    if (NET.paidRun && NET.token) {
+      // paid P2E run: submit automatically under the registered username
+      const p = pending; pending = null; el.nameRow.classList.add('hidden');
+      NET.submit(Object.assign({ name: NET.uname || 'Jimothy' }, p)).then(d => {
+        tSay(d && d.tournament ? 'P2E run recorded: ' + fs + ' pts. Watch the pot!' : 'Run recorded.');
+        pollPot();
+        if (d && d.top) renderServerLB(el.lbOver, d.top, NET.uname);
+      });
+    } else {
+      el.nameRow.classList.toggle('hidden', fs <= 0 || !(NET.online || localQ));
+    }
     if (NET.online) { NET.top().then(d => { if (d && d.top) renderServerLB(el.lbOver, d.top); else renderLB(el.lbOver, -1); }); } else renderLB(el.lbOver, -1);
     el.over.classList.remove('hidden');
   }
@@ -629,11 +689,12 @@
   el.playBtn.addEventListener('click', startRun); el.retryBtn.addEventListener('click', startRun);
   if (el.muteBtn) el.muteBtn.addEventListener('click', () => { const m = AUDIO.toggle(); el.muteBtn.classList.toggle('off', m); });
   const wBtn = document.getElementById('walletBtn'); if (wBtn) wBtn.addEventListener('click', connectWallet);
+  const pBtn = document.getElementById('p2eBtn'); if (pBtn) pBtn.addEventListener('click', payAndRun);
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
   try { const nm = localStorage.getItem('jimothy_run_name'); if (nm) el.nameInput.value = nm; } catch (e) {}
   reset(); running = false; over = false; syncModels(); renderLB(el.lbStart, -1);
-  NET.check().then(d => { if (d && d.top) { renderServerLB(el.lbStart, d.top); const t = document.querySelectorAll('.lb-title'); t.forEach(x => { x.textContent = 'Global leaderboard'; }); } });
+  NET.check().then(d => { if (d && d.top) { renderServerLB(el.lbStart, d.top); const t = document.querySelectorAll('.lb-title'); t.forEach(x => { x.textContent = 'Global leaderboard'; }); } pollPot(); setInterval(pollPot, 30000); });
   requestAnimationFrame(frame);
 
   // Dev-only inspection hook. NEVER shipped on a real host: the production build

@@ -71,6 +71,62 @@ function verifyEd25519(messageStr, sigBuf, pubRaw32) {
 
 const TID = () => (process.env.TOURNAMENT_ID || 'season1').replace(/[^\w-]/g, '');
 
+function b58encode(buf) {
+  let n = 0n; for (const b of buf) n = (n << 8n) + BigInt(b);
+  let s = ''; while (n > 0n) { s = B58[Number(n % 58n)] + s; n /= 58n; }
+  for (const b of buf) { if (b === 0) s = '1' + s; else break; }
+  return s || '1';
+}
+
+// ---- Solana RPC + native SOL transfer (zero-dependency) ------------------
+async function rpc(method, params) {
+  const url = process.env.RPC_URL || 'https://api.mainnet-beta.solana.com';
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  const d = await r.json();
+  if (d.error) { const e = new Error('rpc ' + method + ': ' + d.error.message); e.rpc = true; throw e; }
+  return d.result;
+}
+
+// Sign with a raw 32-byte Ed25519 seed via node crypto (PKCS8 DER wrap)
+function ed25519KeyFromSeed(seed32) {
+  const pkcs8 = Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), seed32]);
+  return crypto.createPrivateKey({ key: pkcs8, format: 'der', type: 'pkcs8' });
+}
+function pubFromSeed(seed32) {
+  const pub = crypto.createPublicKey(ed25519KeyFromSeed(seed32));
+  return pub.export({ format: 'der', type: 'spki' }).subarray(-32);
+}
+
+/* Build + sign a legacy Solana transaction with ONE SystemProgram.transfer.
+   Wire layout (all counts are single-byte compact-u16 — our values are tiny):
+   [sigCount=1][64-byte sig] · message = [header 3B][acct count=3][from][to]
+   [system program][recentBlockhash][ix count=1][programIdx=2][acctIdx 0,1]
+   [data len=12][u32 LE 2 (Transfer)][u64 LE lamports]                       */
+function buildTransferTx(seed32, fromRaw, toRaw, lamports, blockhashRaw) {
+  const SYSTEM = Buffer.alloc(32);   // 111...1 program id = 32 zero bytes
+  const data = Buffer.alloc(12);
+  data.writeUInt32LE(2, 0); data.writeBigUInt64LE(BigInt(lamports), 4);
+  const msg = Buffer.concat([
+    Buffer.from([1, 0, 1]),                       // 1 sig, 0 ro-signed, 1 ro-unsigned
+    Buffer.from([3]), fromRaw, toRaw, SYSTEM,     // account keys
+    blockhashRaw,
+    Buffer.from([1]),                             // one instruction
+    Buffer.from([2]),                             // program id index
+    Buffer.from([2, 0, 1]),                       // 2 account indices: from, to
+    Buffer.from([12]), data,
+  ]);
+  const sig = crypto.sign(null, msg, ed25519KeyFromSeed(seed32));
+  return { wire: Buffer.concat([Buffer.from([1]), sig, msg]), sig };
+}
+
+// Accepts a base58 64-byte secret (Phantom export) or a 32-byte seed
+function parseSecret(b58sec) {
+  const raw = b58decode(String(b58sec).trim());
+  if (raw.length === 64) return raw.subarray(0, 32);
+  if (raw.length === 32) return raw;
+  throw new Error('bad secret key length ' + raw.length);
+}
+
 async function topList(key, shorten) {
   const flat = (await redis('ZREVRANGE', key, '0', '9', 'WITHSCORES')) || [];
   const out = [];
@@ -82,4 +138,4 @@ async function topList(key, shorten) {
   return out;
 }
 
-module.exports = { redis, hmac, timingEqual, readBody, ip, send, sanitizeName, rateLimit, b58decode, verifyEd25519, TID, topList };
+module.exports = { redis, hmac, timingEqual, readBody, ip, send, sanitizeName, rateLimit, b58decode, b58encode, verifyEd25519, TID, topList, rpc, buildTransferTx, parseSecret, pubFromSeed };

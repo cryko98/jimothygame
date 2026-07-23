@@ -5,7 +5,7 @@
      of that SPL token (checked on-chain via RPC). If TOKEN_MINT is not set yet
      (pre-launch), entry is open. */
 'use strict';
-const { redis, readBody, send, rateLimit, b58decode, verifyEd25519, TID } = require('./_lib.js');
+const { redis, readBody, send, rateLimit, b58decode, verifyEd25519, sanitizeName, TID } = require('./_lib.js');
 
 async function tokenBalance(pk) {
   const mint = process.env.TOKEN_MINT;
@@ -33,6 +33,8 @@ module.exports = async (req, res) => {
     const pk = String(b.pk || '');
     let raw; try { raw = b58decode(pk); } catch (e) { raw = null; }
     if (!raw || raw.length !== 32) return send(res, 400, { ok: false, error: 'bad wallet address' });
+    const uname = String(b.name || '').replace(/[^\w \-.]/g, '').trim();
+    if (uname.length < 2) return send(res, 400, { ok: false, error: 'username required (min 2 characters)' });
 
     // 1) the wallet must sign the exact nonce we issued
     const nonce = await redis('GET', 'nonce:' + pk);
@@ -46,9 +48,10 @@ module.exports = async (req, res) => {
     const minBal = Number(process.env.MIN_TOKEN_BALANCE || 1);
     if (balance !== null && balance < minBal) return send(res, 403, { ok: false, error: 'you need at least ' + minBal + ' of the project coin to enter' });
 
-    // 3) register
+    // 3) register (wallet + display name)
     await redis('SADD', 't:' + TID() + ':entrants', pk);
-    send(res, 200, { ok: true, tournament: TID(), balance });
+    await redis('HSET', 't:' + TID() + ':names', pk, sanitizeName(uname));
+    send(res, 200, { ok: true, tournament: TID(), balance, name: sanitizeName(uname) });
   } catch (e) {
     send(res, e.code === 503 ? 503 : 500, { ok: false, error: e.code === 503 ? 'not configured' : 'server error' });
   }

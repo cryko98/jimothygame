@@ -1,6 +1,6 @@
-# Jimothy's Adventures
+# Jimothy Run
 
-The official website and game for **Jimothy**, a short-spine raccoon with a dog on his tail. Ticker: **$JIMO** on **Solana**.
+The official website and game for **Jimothy**, a short-spine raccoon with a dog on his tail. Ticker: **$JIMORUN** on **Solana**.
 
 > "They said a raccoon with a short spine couldn't outrun anything. Jimothy said: watch me."
 
@@ -61,9 +61,14 @@ python -m http.server 8000
 | `UPSTASH_REDIS_REST_TOKEN` | yes | Upstash REST token |
 | `RUN_SECRET` | yes | long random string — signs run tokens (e.g. `openssl rand -hex 32`) |
 | `TOURNAMENT_ID` | no | current tournament key (default `season1`) — bump it per season |
-| `TOKEN_MINT` | no | the $JIMO SPL mint address; **unset = tournament entry open** (pre-launch) |
+| `TOKEN_MINT` | no | the $JIMORUN SPL mint address; **unset = tournament entry open** (pre-launch) |
 | `MIN_TOKEN_BALANCE` | no | minimum holding to enter (default `1`) |
 | `RPC_URL` | no | Solana RPC (default public mainnet; use a private RPC in production) |
+| `PRIZE_WALLET` | for P2E | public address that collects the 0.05 SOL entries and pays the pot |
+| `PRIZE_WALLET_SECRET` | for payouts | base58 secret key of `PRIZE_WALLET` (**dedicated hot wallet only** — it signs the hourly payouts) |
+| `ENTRY_FEE_SOL` | no | P2E entry fee per run (default `0.05`) |
+| `FEE_RESERVE_SOL` | no | always left in the wallet for tx fees (default `0.02`) |
+| `CRON_SECRET` | for payouts | random string; Vercel sends it with the hourly cron so only the cron can trigger payouts |
 
 4. Redeploy. The game detects `/api/lb` and switches to the **global leaderboard** automatically; without the env vars the API answers 503 and the game stays in offline mode.
 
@@ -80,12 +85,13 @@ The browser can never be fully trusted — so the **server is the authority** an
 
 All of this is covered by an offline test suite (17 checks: forged/replayed tokens, impossible speed, formula mismatch, instant submits, bad wallet signatures — all rejected). Honest caveat: no client game can be *literally* 100% tamper-proof (a determined bot could simulate a plausible human run); this design makes score forgery impractical, and tournament payouts should additionally be reviewed manually before sending.
 
-## P2E tournament
+## P2E tournament — hourly SOL pot
 
-- Players click **Connect wallet** (Phantom) on the start screen, sign a one-time nonce, and `/api/t-join` verifies the Ed25519 signature server-side.
-- If `TOKEN_MINT` is set, the wallet must hold ≥ `MIN_TOKEN_BALANCE` of the project coin (checked on-chain via RPC) to enter.
-- Entered wallets' runs land on a separate tournament board (`/api/lb?t=1`), scored with the same anti-cheat pipeline.
-- **Payouts:** export the tournament top (`ZREVRANGE t:<id>:lb 0 N WITHSCORES` in Upstash), review it, then send $JIMO from the treasury wallet to the winners. Never store the treasury private key in this repo, in Vercel env vars, or anywhere client-reachable — sign payouts locally or with a multisig (e.g. Squads).
+- **Entry:** the player types a **username (required)**, connects Phantom and signs a one-time nonce; `/api/t-join` verifies the Ed25519 signature server-side. If `TOKEN_MINT` is set, the wallet must also hold ≥ `MIN_TOKEN_BALANCE` of the project coin (checked on-chain).
+- **Paid runs:** each P2E run costs `ENTRY_FEE_SOL` (default **0.05 SOL**), paid straight to `PRIZE_WALLET`. The server verifies the payment **on-chain** (`/api/t-pay`: correct payer, correct recipient, correct amount, recent, and each transaction spendable exactly once) before issuing a paid run token.
+- **Hourly pot:** paid runs land on the current hour's board (`/api/lb?t=1`). At minute 1 of every hour, a **Vercel cron** calls `/api/payout`: the top player of the hour that just ended receives the **entire wallet balance minus `FEE_RESERVE_SOL`**, sent automatically on-chain (the transaction is built and signed server-side with zero dependencies). Hours with no paid runs roll the pot over.
+- **Live pot on the site:** `/api/pot` feeds the game's tournament panel — current pot, countdown to payout, this hour's leader, and recent winners with their tx signatures.
+- **Hot-wallet warning:** `PRIZE_WALLET_SECRET` makes automated payouts possible, which by definition puts a key on the server. Use a **dedicated wallet that only ever holds entry fees**, never the treasury; sweep profits out regularly. Payout attempts are idempotent (one per hour, Redis-guarded) and the cron is authenticated with `CRON_SECRET`.
 
 ## To do before mainnet launch
 
@@ -96,4 +102,4 @@ All of this is covered by an offline test suite (17 checks: forged/replayed toke
 
 ---
 
-*$JIMO is a community meme coin with no intrinsic value or expectation of financial return. Not financial advice. Always do your own research.*
+*$JIMORUN is a community meme coin with no intrinsic value or expectation of financial return. Not financial advice. Always do your own research.*

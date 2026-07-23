@@ -17,12 +17,21 @@ module.exports = async (req, res) => {
     if (!(await rateLimit(req, 'submit', 20))) return send(res, 429, { ok: false, error: 'slow down' });
     const b = await readBody(req);
 
-    // 1) token: shape + signature + age
+    // 1) token: shape + signature + age. Two forms:
+    //    free run:  runId.ts.sig            (sig = hmac(runId.ts))
+    //    paid run:  runId.ts.1.sig          (sig = hmac(runId.ts.1.<wallet>) — bound to the payer)
+    const wallet = typeof b.wallet === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(b.wallet) ? b.wallet : null;
     const parts = String(b.token || '').split('.');
-    if (parts.length !== 3) return send(res, 400, { ok: false, error: 'bad token' });
-    const [runId, tsStr, sig] = parts, ts = Number(tsStr);
-    if (!/^[0-9a-f]{24}$/.test(runId) || !Number.isFinite(ts)) return send(res, 400, { ok: false, error: 'bad token' });
-    if (!timingEqual(sig, hmac(runId + '.' + ts))) return send(res, 400, { ok: false, error: 'bad signature' });
+    let runId, ts, paid = false;
+    if (parts.length === 3) {
+      runId = parts[0]; ts = Number(parts[1]);
+      if (!/^[0-9a-f]{24}$/.test(runId) || !Number.isFinite(ts)) return send(res, 400, { ok: false, error: 'bad token' });
+      if (!timingEqual(parts[2], hmac(runId + '.' + ts))) return send(res, 400, { ok: false, error: 'bad signature' });
+    } else if (parts.length === 4 && parts[2] === '1') {
+      runId = parts[0]; ts = Number(parts[1]); paid = true;
+      if (!/^[0-9a-f]{24}$/.test(runId) || !Number.isFinite(ts) || !wallet) return send(res, 400, { ok: false, error: 'bad token' });
+      if (!timingEqual(parts[3], hmac(runId + '.' + ts + '.1.' + wallet))) return send(res, 400, { ok: false, error: 'bad signature' });
+    } else return send(res, 400, { ok: false, error: 'bad token' });
     const elapsed = (Date.now() - ts) / 1000;
     if (elapsed < 0 || elapsed * 1000 > MAX_AGE_MS) return send(res, 400, { ok: false, error: 'token expired' });
 
@@ -51,12 +60,17 @@ module.exports = async (req, res) => {
     const name = sanitizeName(b.name);
     await redis('ZADD', 'lb', 'GT', String(score), name);
 
-    // tournament board: only wallets that entered via /api/t-join
+    // PAID runs land on the current hour's tournament board (winner takes the pot)
     let tournament = false;
-    const wallet = typeof b.wallet === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(b.wallet) ? b.wallet : null;
-    if (wallet) {
+    if (paid && wallet) {
       const entered = await redis('SISMEMBER', 't:' + TID() + ':entrants', wallet);
-      if (entered === 1) { await redis('ZADD', 't:' + TID() + ':lb', 'GT', String(score), wallet); tournament = true; }
+      if (entered === 1) {
+        const hour = new Date().toISOString().slice(0, 13);
+        const hkey = 't:' + TID() + ':h:' + hour + ':lb';
+        await redis('ZADD', hkey, 'GT', String(score), wallet);
+        await redis('EXPIRE', hkey, 3 * 86400);
+        tournament = true;
+      }
     }
 
     send(res, 200, { ok: true, tournament, top: await topList('lb', false) });
