@@ -91,6 +91,10 @@
     try {
       const ph = window.solana, sw = window.solanaWeb3;
       if (!NET.entered || !ph || !sw) { tSay('Connect your wallet first.'); return; }
+      // don't let the player pay into a break or a round's final seconds
+      const potState = await pollPot();
+      if (potState && potState.state === 'break') { tSay('Break between rounds — next round in ' + fmtMS(potState.breakMs) + '.'); return; }
+      if (potState && potState.state === 'active' && potState.roundEndsMs < 45000) { tSay('This round is ending — wait for the break, then start the next one.'); return; }
       tSay('Preparing payment…');
       const cfg = await fetch('/api/t-config').then(r => r.json());
       if (!cfg.ok) { tSay(cfg.error || 'Config unavailable.'); return; }
@@ -110,17 +114,20 @@
     } catch (e) { tSay('Payment cancelled or failed.'); }
     finally { paying = false; }
   }
-  // live pot display
+  // live pot display — rounds start with the first paid entry
+  const fmtMS = ms => { const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000); return m + ':' + String(s).padStart(2, '0'); };
   async function pollPot() {
     if (!NET.online) return;
     const elp = document.getElementById('potLine'); if (!elp) return;
     const d = await fetch('/api/pot').then(r => r.json()).catch(() => null);
     if (!d || !d.ok) return;
-    const mm = Math.floor(d.nextPayoutMs / 60000), ss = Math.floor((d.nextPayoutMs % 60000) / 1000);
-    let txt = 'Pot: ' + d.potSol + ' SOL · payout in ' + mm + ':' + String(ss).padStart(2, '0');
-    if (d.leader) txt += ' · leading: ' + d.leader.name + ' (' + d.leader.score + ')';
+    let txt = 'Pot: ' + d.potSol + ' SOL';
+    if (d.state === 'active') { txt += ' · round ends in ' + fmtMS(d.roundEndsMs); if (d.leader) txt += ' · leading: ' + d.leader.name + ' (' + d.leader.score + ')'; }
+    else if (d.state === 'break') txt += ' · break — next round in ' + fmtMS(d.breakMs);
+    else txt += ' · no round yet — the first paid run starts the 1-hour round!';
     if (d.winners && d.winners[0]) txt += ' · last winner: ' + (d.winners[0].name || 'anon') + ' +' + d.winners[0].amountSol + ' SOL';
     elp.textContent = txt;
+    return d;
   }
 
   const el = {

@@ -85,13 +85,15 @@ The browser can never be fully trusted — so the **server is the authority** an
 
 All of this is covered by an offline test suite (17 checks: forged/replayed tokens, impossible speed, formula mismatch, instant submits, bad wallet signatures — all rejected). Honest caveat: no client game can be *literally* 100% tamper-proof (a determined bot could simulate a plausible human run); this design makes score forgery impractical, and tournament payouts should additionally be reviewed manually before sending.
 
-## P2E tournament — hourly SOL pot
+## P2E tournament — rolling rounds, winner takes the pot
 
 - **Entry:** the player types a **username (required)**, connects Phantom and signs a one-time nonce; `/api/t-join` verifies the Ed25519 signature server-side. If `TOKEN_MINT` is set, the wallet must also hold ≥ `MIN_TOKEN_BALANCE` of the project coin (checked on-chain).
-- **Paid runs:** each P2E run costs `ENTRY_FEE_SOL` (default **0.05 SOL**), paid straight to `PRIZE_WALLET`. The server verifies the payment **on-chain** (`/api/t-pay`: correct payer, correct recipient, correct amount, recent, and each transaction spendable exactly once) before issuing a paid run token.
-- **Hourly pot:** paid runs land on the current hour's board (`/api/lb?t=1`). At minute 1 of every hour, a **Vercel cron** calls `/api/payout`: the top player of the hour that just ended receives the **entire wallet balance minus `FEE_RESERVE_SOL`**, sent automatically on-chain (the transaction is built and signed server-side with zero dependencies). Hours with no paid runs roll the pot over.
-- **Live pot on the site:** `/api/pot` feeds the game's tournament panel — current pot, countdown to payout, this hour's leader, and recent winners with their tx signatures.
-- **Hot-wallet warning:** `PRIZE_WALLET_SECRET` makes automated payouts possible, which by definition puts a key on the server. Use a **dedicated wallet that only ever holds entry fees**, never the treasury; sweep profits out regularly. Payout attempts are idempotent (one per hour, Redis-guarded) and the cron is authenticated with `CRON_SECRET`.
+- **Paid runs:** each P2E run costs `ENTRY_FEE_SOL` (default **0.05 SOL**), paid straight to `PRIZE_WALLET`. The server verifies the payment **on-chain** (`/api/t-pay`: correct payer, correct recipient, correct amount, recent, and each transaction spendable exactly once) before issuing a paid run token — bound to the payer's wallet **and the round**.
+- **Rounds:** the **first confirmed payment opens a 1-hour round**. Paid runs land on that round's board (`/api/lb?t=1`). When the round ends (plus a 2-minute grace so a run finishing at the buzzer still counts), the round's #1 receives the **entire wallet balance minus `FEE_RESERVE_SOL`**, sent automatically on-chain (the transfer is built and signed server-side with zero dependencies). Then a **5-minute break** — payments during the break are rejected *without being consumed*, so the same transaction can be retried when the next round opens. Rounds with no runs roll the pot over.
+- **Settlement is lazy + cron-backed:** any traffic (`/api/pot` polls from open game pages, payments, submits) settles an expired round idempotently (a Redis claim guarantees a round can never pay twice); the Vercel cron is only a backup trigger. This works reliably even on Vercel's Hobby plan, where crons run just once a day.
+- **Live pot on the site:** `/api/pot` feeds the game's tournament panel — current pot, round countdown (or break countdown), the round's leader, and recent winners with their tx signatures.
+- **Anti-abuse specifics:** tournament runs are capped at 15 minutes; payments can't enter a round in its final 30 seconds (no last-second snipe with a fresh token that outlives the round); a paid token from an already-settled round falls back to the global board only.
+- **Hot-wallet warning:** `PRIZE_WALLET_SECRET` makes automated payouts possible, which by definition puts a key on the server. Use a **dedicated wallet that only ever holds entry fees**, never the treasury; sweep profits out regularly.
 
 ## To do before mainnet launch
 

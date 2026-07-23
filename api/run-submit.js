@@ -4,7 +4,7 @@
    distance is physically possible, that pickup counts are plausible, and that
    the score matches the game's exact formula. Anything implausible is dropped. */
 'use strict';
-const { redis, hmac, timingEqual, readBody, send, sanitizeName, rateLimit, TID, topList } = require('./_lib.js');
+const { redis, hmac, timingEqual, readBody, send, sanitizeName, rateLimit, TID, topList, GRACE_MS, roundBoard, getRound, settleRound } = require('./_lib.js');
 
 const MAX_SPEED = 22;        // units/sec — above the game's real top speed
 const MIN_DUR = 5;           // runs shorter than this can't score
@@ -18,19 +18,19 @@ module.exports = async (req, res) => {
     const b = await readBody(req);
 
     // 1) token: shape + signature + age. Two forms:
-    //    free run:  runId.ts.sig            (sig = hmac(runId.ts))
-    //    paid run:  runId.ts.1.sig          (sig = hmac(runId.ts.1.<wallet>) — bound to the payer)
+    //    free run:  runId.ts.sig             (sig = hmac(runId.ts))
+    //    paid run:  runId.ts.R<round>.sig    (sig = hmac(runId.ts.R<round>.<wallet>) — bound to payer AND round)
     const wallet = typeof b.wallet === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(b.wallet) ? b.wallet : null;
     const parts = String(b.token || '').split('.');
-    let runId, ts, paid = false;
+    let runId, ts, paid = false, tokenRound = null;
     if (parts.length === 3) {
       runId = parts[0]; ts = Number(parts[1]);
       if (!/^[0-9a-f]{24}$/.test(runId) || !Number.isFinite(ts)) return send(res, 400, { ok: false, error: 'bad token' });
       if (!timingEqual(parts[2], hmac(runId + '.' + ts))) return send(res, 400, { ok: false, error: 'bad signature' });
-    } else if (parts.length === 4 && parts[2] === '1') {
-      runId = parts[0]; ts = Number(parts[1]); paid = true;
+    } else if (parts.length === 4 && /^R[0-9a-z]{6,20}$/.test(parts[2])) {
+      runId = parts[0]; ts = Number(parts[1]); paid = true; tokenRound = parts[2].slice(1);
       if (!/^[0-9a-f]{24}$/.test(runId) || !Number.isFinite(ts) || !wallet) return send(res, 400, { ok: false, error: 'bad token' });
-      if (!timingEqual(parts[3], hmac(runId + '.' + ts + '.1.' + wallet))) return send(res, 400, { ok: false, error: 'bad signature' });
+      if (!timingEqual(parts[3], hmac(runId + '.' + ts + '.' + parts[2] + '.' + wallet))) return send(res, 400, { ok: false, error: 'bad signature' });
     } else return send(res, 400, { ok: false, error: 'bad token' });
     const elapsed = (Date.now() - ts) / 1000;
     if (elapsed < 0 || elapsed * 1000 > MAX_AGE_MS) return send(res, 400, { ok: false, error: 'token expired' });
@@ -60,20 +60,27 @@ module.exports = async (req, res) => {
     const name = sanitizeName(b.name);
     await redis('ZADD', 'lb', 'GT', String(score), name);
 
-    // PAID runs land on the current hour's tournament board (winner takes the pot)
-    let tournament = false;
+    // PAID runs land on THEIR round's board — accepted only while that round
+    // is still open (plus a short grace so a run finishing at the buzzer counts)
+    let tournament = false, tournamentNote = null;
     if (paid && wallet) {
-      const entered = await redis('SISMEMBER', 't:' + TID() + ':entrants', wallet);
-      if (entered === 1) {
-        const hour = new Date().toISOString().slice(0, 13);
-        const hkey = 't:' + TID() + ':h:' + hour + ':lb';
-        await redis('ZADD', hkey, 'GT', String(score), wallet);
-        await redis('EXPIRE', hkey, 3 * 86400);
-        tournament = true;
+      if (dur > 900) { tournamentNote = 'tournament runs are capped at 15 minutes'; }
+      else {
+        const entered = await redis('SISMEMBER', 't:' + TID() + ':entrants', wallet);
+        if (entered === 1) {
+          await settleRound();   // settle first so an expired round can't be written into
+          const round = await getRound();
+          if (round && round.id === tokenRound && Date.now() <= round.end + GRACE_MS) {
+            const rkey = roundBoard(round.id);
+            await redis('ZADD', rkey, 'GT', String(score), wallet);
+            await redis('EXPIRE', rkey, 3 * 86400);
+            tournament = true;
+          } else tournamentNote = 'round already ended — this run counts on the global board only';
+        }
       }
     }
 
-    send(res, 200, { ok: true, tournament, top: await topList('lb', false) });
+    send(res, 200, { ok: true, tournament, tournamentNote, top: await topList('lb', false) });
   } catch (e) {
     send(res, e.code === 503 ? 503 : 500, { ok: false, error: e.code === 503 ? 'not configured' : 'server error' });
   }

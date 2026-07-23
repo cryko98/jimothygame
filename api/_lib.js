@@ -140,4 +140,56 @@ async function topList(key, shorten) {
   return out;
 }
 
-module.exports = { redis, hmac, timingEqual, readBody, ip, send, sanitizeName, rateLimit, b58decode, b58encode, verifyEd25519, TID, topList, rpc, buildTransferTx, parseSecret, pubFromSeed };
+// ---- rolling tournament rounds -------------------------------------------
+// A round STARTS when the first paid entry is confirmed, runs ROUND_MS, then
+// pays the round's #1 and enters a BREAK_MS cooldown. The next round starts
+// with the next first payment after the break. Settlement is "lazy": any
+// traffic (pot poll / payment / submit / cron) settles an expired round —
+// no reliance on precise cron scheduling.
+const ROUND_MS = 3600000, GRACE_MS = 120000, BREAK_MS = 300000;
+const roundKey = () => 't:' + TID() + ':round';
+const breakKey = () => 't:' + TID() + ':break';
+const roundBoard = id => 't:' + TID() + ':r:' + id + ':lb';
+async function getRound() { const s = await redis('GET', roundKey()); if (!s) return null; try { return JSON.parse(s); } catch (e) { return null; } }
+async function breakLeftMs() { const t = await redis('PTTL', breakKey()); return (typeof t === 'number' && t > 0) ? t : 0; }
+
+async function settleRound() {
+  const r = await getRound();
+  if (!r) return { state: (await breakLeftMs()) > 0 ? 'break' : 'idle' };
+  const now = Date.now();
+  if (now <= r.end + GRACE_MS) return { state: 'active', round: r };
+
+  // round over → claim it exactly once (double triggers can never double-pay)
+  const claim = await redis('SET', 'paid:' + TID() + ':' + r.id, '1', 'NX', 'EX', 7 * 86400);
+  if (claim !== 'OK') {
+    const cur = await getRound();
+    if (cur && cur.id === r.id) { await redis('DEL', roundKey()); await redis('SET', breakKey(), '1', 'PX', String(BREAK_MS)); }
+    return { state: 'break' };
+  }
+  let rec = null;
+  try {
+    const top = (await redis('ZREVRANGE', roundBoard(r.id), '0', '0', 'WITHSCORES')) || [];
+    const secret = process.env.PRIZE_WALLET_SECRET, prize = process.env.PRIZE_WALLET;
+    if (top.length && secret && prize) {
+      const winner = top[0], score = Math.round(Number(top[1]));
+      const seed = parseSecret(secret);
+      if (b58encode(pubFromSeed(seed)) === prize) {
+        const bal = await rpc('getBalance', [prize, { commitment: 'confirmed' }]);
+        const lamports = (bal.value || 0) - Math.round(Number(process.env.FEE_RESERVE_SOL || 0.02) * 1e9);
+        if (lamports >= 1e6) {
+          const bh = await rpc('getLatestBlockhash', [{ commitment: 'finalized' }]);
+          const { wire } = buildTransferTx(seed, pubFromSeed(seed), b58decode(winner), lamports, b58decode(bh.value.blockhash));
+          const sig = await rpc('sendTransaction', [wire.toString('base64'), { encoding: 'base64', maxRetries: 5 }]);
+          const name = await redis('HGET', 't:' + TID() + ':names', winner);
+          rec = { round: r.id, wallet: winner, name: name || null, score, amountSol: Math.round(lamports / 1e6) / 1e3, sig, at: Date.now() };
+        }
+      }
+    }
+  } catch (e) { rec = null; }   // send failed → pot rolls into the next round
+  if (rec) { await redis('LPUSH', 't:' + TID() + ':winners', JSON.stringify(rec)); await redis('LTRIM', 't:' + TID() + ':winners', '0', '19'); }
+  await redis('DEL', roundKey());
+  await redis('SET', breakKey(), '1', 'PX', String(BREAK_MS));
+  return { state: 'settled', paid: rec };
+}
+
+module.exports = { redis, hmac, timingEqual, readBody, ip, send, sanitizeName, rateLimit, b58decode, b58encode, verifyEd25519, TID, topList, rpc, buildTransferTx, parseSecret, pubFromSeed, ROUND_MS, GRACE_MS, BREAK_MS, roundKey, breakKey, roundBoard, getRound, breakLeftMs, settleRound };
