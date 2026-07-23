@@ -3,8 +3,10 @@
 'use strict';
 const crypto = require('crypto');
 
-const UP_URL = process.env.UPSTASH_REDIS_REST_URL;
-const UP_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Accept both naming schemes: manual Upstash setup (UPSTASH_*) and the
+// Vercel Marketplace / KV integration (KV_REST_API_*).
+const UP_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const UP_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
 // Single Redis command over Upstash REST: redis('ZADD','lb','GT','10','name')
 async function redis(...cmd) {
