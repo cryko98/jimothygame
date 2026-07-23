@@ -174,7 +174,11 @@ a:hover { text-decoration: underline; }
 /* ---------- Community ---------- */
 .community { text-align: center; }
 .social-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem; }
-.social-btn { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.8rem; font-family: 'Fredoka', sans-serif; font-weight: 600; color: var(--ink); box-shadow: var(--shadow-sm); transition: transform .12s ease, border-color .12s ease; }
+.social-btn { display: inline-flex; align-items: center; gap: .55rem; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.8rem; font-family: 'Fredoka', sans-serif; font-weight: 600; color: var(--ink); box-shadow: var(--shadow-sm); transition: transform .12s ease, border-color .12s ease; }
+.social-btn .x-ico { width: 1.05em; height: 1.05em; }
+.nav-x { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: #fff; transition: transform .12s ease, background .12s ease; }
+.nav-x svg { width: 16px; height: 16px; }
+.nav-x:hover { transform: translateY(-2px); background: #000; text-decoration: none; }
 .social-btn:hover { transform: translateY(-3px); border-color: var(--accent); color: var(--accent-dark); text-decoration: none; }
 
 /* ---------- Footer ---------- */
